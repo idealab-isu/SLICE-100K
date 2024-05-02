@@ -13,6 +13,20 @@ from contour_flipping import flip_on_contours
 
 access_token = "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"
 
+def get_layers(aligned_gcode):
+    layers = []
+    for gcode_a,gcode_b in aligned_gcode:
+        layers_a = gcode_a.split(';LAYER_CHANGE')
+        layers_b = gcode_b.split(';LAYER_CHANGE')
+
+        #add back the layer change command to each layer except first
+        for i in range(1,len(layers_a)):
+            layers_a[i] = ';LAYER_CHANGE' + layers_a[i]
+        for i in range(1,len(layers_b)):
+            layers_b[i] = ';LAYER_CHANGE' + layers_b[i]
+        layers.extend(list(zip(layers_a,layers_b)))
+    return layers
+
 def make_json(chunk_list):
     """
     Converts a list of chunks into a JSON file.
@@ -113,26 +127,31 @@ def main(args):
 
     # Split up Marlin and Sailfish into corresponding chunks that are small enough
     # to fit in context window of transformer-based model
+    layers_to_chunk = get_layers(aligned_gcode)
     chunk_list = []
     successes = 0
     failures = 0
-    print('Creating chunks from %s files' % len(aligned_gcode))
-    for i in tqdm(range(len(aligned_gcode))):
-        aligned_a,aligned_b = aligned_gcode[i]
+    print('Creating chunks from %s layers' % len(layers_to_chunk))
+    for i in tqdm(range(len(layers_to_chunk))):
+        aligned_a,aligned_b = layers_to_chunk[i]
+        # chunks = aligned_chunks(aligned_a,aligned_b,args.chunk_size)  
         try:
             chunks = aligned_chunks(aligned_a,aligned_b,args.chunk_size)
             chunk_list.extend(chunks)
+            successes +=1
         except:
             failures+=1
-    print(f'{successes}/{successes+failures} files successfully chunked')
-
+    print(f'{successes}/{successes+failures} layers successfully chunked')
+    print('Total number of chunks: %s' % len(chunk_list))
     make_json(chunk_list)
+    print('Made json file')
+    print('Signing off...')
 
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--n_files", type=int, default=200)
-    parser.add_argument("--chunk_size", type=int, default=15)
+    parser.add_argument("--n_files", type=int, default=50)
+    parser.add_argument("--chunk_size", type=int, default=20)
     parser.add_argument("--data_path", type=str, default="/vast/km3888/paired_gcode")
     parser.add_argument("--output_path", type=str, default="/vast/km3888/paired_gcode/chunked_data")
     args = parser.parse_args()

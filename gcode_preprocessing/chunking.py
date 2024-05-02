@@ -1,6 +1,24 @@
 import pdb
+from preprocess_utils import debug
 
-def find_same(text_a_lines,text_b_lines,i,start_j):
+def chunk_debug(text_a_lines, text_b_lines, start_i,end_i,start_j,end_j,max_lines):
+    if end_j==-1:
+        end_j = start_j + max_lines + 1
+    debug_a_lines = text_a_lines[:start_i + max_lines + 1]
+    debug_b_lines = text_b_lines[:end_j+1]
+
+    debug_a_lines[start_i] += " START"
+    debug_a_lines[end_i] += " END"
+
+    debug_b_lines[start_j] += " START"
+    debug_b_lines[end_j] += " END"
+
+    debug_a = "\n".join(debug_a_lines)
+    debug_b = "\n".join(debug_b_lines)
+
+    debug(debug_a, debug_b)
+
+def find_same(text_a_lines,text_b_lines,i,start_j,max_lines):
     """
     Finds the first line in text_b that is the same as line_i in text_a.
 
@@ -13,15 +31,22 @@ def find_same(text_a_lines,text_b_lines,i,start_j):
         The index of the first line in text_b that is the same as line_i in text_a.
     """
     #TODO, make this operate on pairs of layers instead of pairs of files
-    for j,line in enumerate(text_b_lines[start_j:]):
+    # pdb.set_trace()
+    line_i = text_a_lines[i]
+    if 'G92 E0' in line_i:
+        return -1
+    line_i = line_i.split(' E')[0]
+    permitted = [';TYPE:Overhang perimeter', ';LAYER_CHANGE',";TYPE:External perimeter"]
+    for j,line in enumerate(text_b_lines[start_j:start_j+2*max_lines]):
         if not "X" in line or not "Y" in line:
-            continue
+            if line not in permitted and ";WIDTH" not in line:
+                continue
         #make sure that we're looking at a coordinate placement line
-        line_i = text_a_lines[i].split(' E')[0]
         #remove the extrusion value since that varies across flavors
         line_j = line.split(' E')[0]
         if line_j==line_i:
             return j+start_j
+    return -1
 
 def aligned_chunks(text_a, text_b, max_lines):
     """
@@ -62,12 +87,11 @@ def aligned_chunks(text_a, text_b, max_lines):
             chunk_b = "".join(x + "\n" for x in text_b_lines[start_j:])
             chunks.append({"text_1": chunk_a, "text_2": chunk_b})
             break
-        end_j = find_same(text_a_lines, text_b_lines, end_i, start_j)
+        end_j = find_same(text_a_lines, text_b_lines, end_i, start_j, max_lines)
         if (end_j - start_j) > 2 * (end_i - start_i):
-            debug_a = "\n".join(text_a_lines[:end_i])
-            debug_b = "\n".join(text_b_lines[:end_j])
-            debug(debug_a, debug_b)
+            #insert markers for start line and end_line in both debug_a and debug_b
             pdb.set_trace()
+            chunk_debug(text_a, text_b, start_i,end_i,start_j,end_j,max_lines)
             raise Exception("Something bad happened")
         if end_j != -1 and ((end_j - start_j) * 2 < (end_i - start_i)):
             # check whether text_a_lines[i] is a duplicate within its own chunk
@@ -88,7 +112,7 @@ def aligned_chunks(text_a, text_b, max_lines):
                 print("text_b_lines[end_j]:", text_b_lines[end_j])
                 relevant_a = "\n".join(text_a_lines[start_i - 20:end_i + 20])
                 relevant_b = "\n".join(text_b_lines[start_j - 20:end_j + 20])
-                debug(relevant_a, relevant_b)
+                chunk_debug(text_a_lines, text_b_lines, start_i,end_i,start_j,end_j,max_lines)
                 pdb.set_trace()
         if end_j == -1:
             if (end_i - start_i) < max_lines // 2:
@@ -103,6 +127,7 @@ def aligned_chunks(text_a, text_b, max_lines):
                     b = chunk["text_2"]
                     # convert_strings_to_table(a,b)
                 # convert_strings_to_table(text_,text_b)
+                chunk_debug(text_a_lines, text_b_lines, start_i,end_i,start_j,end_j,max_lines)
                 pdb.set_trace()
                 raise Exception("Hey what's going on here")
             end_i -= 1
