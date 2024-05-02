@@ -51,3 +51,49 @@ def convert_strings_to_table(text_1, text_2):
 
     # Printing the table
     print(table)
+
+def get_layers(aligned_gcode):
+    layers = []
+    for gcode_a,gcode_b in aligned_gcode:
+        layers_a = gcode_a.split(';LAYER_CHANGE')
+        layers_b = gcode_b.split(';LAYER_CHANGE')
+
+        #add back the layer change command to each layer except first
+        for i in range(1,len(layers_a)):
+            layers_a[i] = ';LAYER_CHANGE' + layers_a[i]
+        for i in range(1,len(layers_b)):
+            layers_b[i] = ';LAYER_CHANGE' + layers_b[i]
+        layers.extend(list(zip(layers_a,layers_b)))
+    return layers
+
+def chunk_debug(text_a_lines, text_b_lines, start_i, end_i, start_j, end_j, max_lines):
+    """
+    Debugs the chunking process by highlighting the start and end lines in the given text_a_lines and text_b_lines.
+
+    Args:
+        text_a_lines (list): List of lines from text A.
+        text_b_lines (list): List of lines from text B.
+        start_i (int): Start index of the chunk in text_a_lines.
+        end_i (int): End index of the chunk in text_a_lines.
+        start_j (int): Start index of the chunk in text_b_lines.
+        end_j (int): End index of the chunk in text_b_lines.
+        max_lines (int): Maximum number of lines to include in the debug output.
+
+    Returns:
+        None
+    """
+    if end_j == -1:
+        end_j = start_j + max_lines + 1
+    debug_a_lines = text_a_lines[:start_i + max_lines + 1]
+    debug_b_lines = text_b_lines[:end_j + 1]
+
+    debug_a_lines[start_i] += " START"
+    debug_a_lines[end_i] += " END"
+
+    debug_b_lines[start_j] += " START"
+    debug_b_lines[end_j] += " END"
+
+    debug_a = "\n".join(debug_a_lines)
+    debug_b = "\n".join(debug_b_lines)
+
+    debug(debug_a, debug_b)

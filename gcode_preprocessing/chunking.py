@@ -1,11 +1,26 @@
 import pdb
 from preprocess_utils import debug
 
-def chunk_debug(text_a_lines, text_b_lines, start_i,end_i,start_j,end_j,max_lines):
-    if end_j==-1:
+def chunk_debug(text_a_lines, text_b_lines, start_i, end_i, start_j, end_j, max_lines):
+    """
+    Debugs the chunking process by highlighting the start and end lines in the given text_a_lines and text_b_lines.
+
+    Args:
+        text_a_lines (list): List of lines from text A.
+        text_b_lines (list): List of lines from text B.
+        start_i (int): Start index of the chunk in text_a_lines.
+        end_i (int): End index of the chunk in text_a_lines.
+        start_j (int): Start index of the chunk in text_b_lines.
+        end_j (int): End index of the chunk in text_b_lines.
+        max_lines (int): Maximum number of lines to include in the debug output.
+
+    Returns:
+        None
+    """
+    if end_j == -1:
         end_j = start_j + max_lines + 1
     debug_a_lines = text_a_lines[:start_i + max_lines + 1]
-    debug_b_lines = text_b_lines[:end_j+1]
+    debug_b_lines = text_b_lines[:end_j + 1]
 
     debug_a_lines[start_i] += " START"
     debug_a_lines[end_i] += " END"
@@ -89,9 +104,6 @@ def aligned_chunks(text_a, text_b, max_lines):
             break
         end_j = find_same(text_a_lines, text_b_lines, end_i, start_j, max_lines)
         if (end_j - start_j) > 2 * (end_i - start_i):
-            #insert markers for start line and end_line in both debug_a and debug_b
-            pdb.set_trace()
-            chunk_debug(text_a, text_b, start_i,end_i,start_j,end_j,max_lines)
             raise Exception("Something bad happened")
         if end_j != -1 and ((end_j - start_j) * 2 < (end_i - start_i)):
             # check whether text_a_lines[i] is a duplicate within its own chunk
@@ -101,34 +113,9 @@ def aligned_chunks(text_a, text_b, max_lines):
                 end_i -= 1
                 continue
             else:
-                print('-' * 8)
-                print("start_i:", start_i)
-                print("end_i:", end_i)
-                print("start_j:", start_j)
-                print("end_j:", end_j)
-                print("text_a_lines[start_i]:", text_a_lines[start_i])
-                print("text_a_lines[end_i]:", text_a_lines[end_i])
-                print("text_b_lines[start_j]:", text_b_lines[start_j])
-                print("text_b_lines[end_j]:", text_b_lines[end_j])
-                relevant_a = "\n".join(text_a_lines[start_i - 20:end_i + 20])
-                relevant_b = "\n".join(text_b_lines[start_j - 20:end_j + 20])
-                chunk_debug(text_a_lines, text_b_lines, start_i,end_i,start_j,end_j,max_lines)
-                pdb.set_trace()
+                raise Exception("Something bad happened")
         if end_j == -1:
             if (end_i - start_i) < max_lines // 2:
-                print('start_i:', start_i)
-                print('end_i:', end_i)
-                print(text_a_lines[start_i])
-                print(text_a_lines[end_i])
-                # pdb.set_trace()
-                print('broken')
-                for chunk in chunks:
-                    a = chunk["text_1"]
-                    b = chunk["text_2"]
-                    # convert_strings_to_table(a,b)
-                # convert_strings_to_table(text_,text_b)
-                chunk_debug(text_a_lines, text_b_lines, start_i,end_i,start_j,end_j,max_lines)
-                pdb.set_trace()
                 raise Exception("Hey what's going on here")
             end_i -= 1
         else:
