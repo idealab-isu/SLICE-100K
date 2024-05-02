@@ -21,7 +21,6 @@ def debug(layer_a, layer_b, layer_a_delimited=None, layer_b_delimited=None):
     with open('debug_outputs/layer_b.gcode', 'w') as f:
         f.write(prefix + layer_b)
 
-
 def convert_strings_to_table(text_1, text_2):
     """
     Display two chunks of code side-by-side in a table format.

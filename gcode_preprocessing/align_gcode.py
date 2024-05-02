@@ -7,25 +7,12 @@ import os
 import sys
 import argparse
 
-from preprocess_utils import debug
+from preprocess_utils import debug, get_layers
 from chunking import aligned_chunks
 from contour_flipping import flip_on_contours
 
 access_token = "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"
 
-def get_layers(aligned_gcode):
-    layers = []
-    for gcode_a,gcode_b in aligned_gcode:
-        layers_a = gcode_a.split(';LAYER_CHANGE')
-        layers_b = gcode_b.split(';LAYER_CHANGE')
-
-        #add back the layer change command to each layer except first
-        for i in range(1,len(layers_a)):
-            layers_a[i] = ';LAYER_CHANGE' + layers_a[i]
-        for i in range(1,len(layers_b)):
-            layers_b[i] = ';LAYER_CHANGE' + layers_b[i]
-        layers.extend(list(zip(layers_a,layers_b)))
-    return layers
 
 def make_json(chunk_list):
     """
