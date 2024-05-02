@@ -1,6 +1,5 @@
 from tqdm import tqdm
 import json
-from prettytable import PrettyTable
 import pdb
 import os
 import sys
@@ -76,7 +75,7 @@ if __name__=="__main__":
 
     data = get_data(args.data_path,1)
     layers = get_layers(data)
-    for layer_a,layer_b in layers:
+    for layer_a,layer_b in layers[1:]:
         processed = relative_extrusion(layer_a)
         convert_strings_to_table(layer_a,processed)
     # main(args)
