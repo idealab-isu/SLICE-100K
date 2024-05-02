@@ -44,6 +44,8 @@ def aligned_chunks(text_a, text_b, max_lines):
               Each dictionary contains two keys: 'text_1' for the chunk of text_a and
               'text_2' for the chunk of text_b.
     """
+    if not len(text_a) or not len(text_b):
+        return []
     if not (isinstance(text_a, str) and isinstance(text_b, str)):
         pdb.set_trace()
     text_a_lines = text_a.strip().split('\n')

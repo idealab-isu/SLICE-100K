@@ -105,6 +105,7 @@ def main(args):
     for i in tqdm(range(len(data))):
         gcode_a, gcode_b = data[i]
         flipped_a,flipped_b,successes,failures = flip_on_contours(gcode_a,gcode_b)
+        aligned_gcode.append((flipped_a,flipped_b))
         total_successes+=successes
         total_failures+=failures
     print('finished contour flipping!')
@@ -115,13 +116,15 @@ def main(args):
     chunk_list = []
     successes = 0
     failures = 0
-    for aligned_a,aligned_b in aligned_gcode:
+    print('Creating chunks from %s files' % len(aligned_gcode))
+    for i in tqdm(range(len(aligned_gcode))):
+        aligned_a,aligned_b = aligned_gcode[i]
         try:
             chunks = aligned_chunks(aligned_a,aligned_b,args.chunk_size)
             chunk_list.extend(chunks)
         except:
             failures+=1
-    print(f'{successes}/{successes+failures} chunks successfully created')
+    print(f'{successes}/{successes+failures} files successfully chunked')
 
     make_json(chunk_list)
 

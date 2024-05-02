@@ -191,9 +191,9 @@ def flip_layer_on_contours(layer_a, layer_b):
     """
     # Sometimes the first delimiter isn't recognized so we just get rid of the stuff before it and then tack that part
     # back on at the end
-    layer_a, layer_b, content_b_before, content_b_after = insert_first_delimiter(layer_a, layer_b)
-    content_a_after += '\n final'
-    content_b_after += '\n final'
+    content_a_before, layer_a, content_b_before, layer_b = insert_first_delimiter(layer_a, layer_b)
+    layer_a += '\n final'
+    layer_b += '\n final'
 
     # we insert delimiters between all the contours to efficiently split the text into blocks
     # note that A and B should have same set of contours but in a different order
@@ -206,7 +206,7 @@ def flip_layer_on_contours(layer_a, layer_b):
     if len(layer_a_blocks) != len(layer_b_blocks):
         raise Exception('Different number of blocks')
     if len(layer_a_blocks) <= 1:
-        return content_a_before + content_a_after
+        return content_b_before + layer_b
     if layer_a_blocks[-1] == "":
         layer_a_blocks.pop()
     
@@ -266,9 +266,8 @@ def flip_on_contours(text_a, text_b):
     text_b_layers = text_b.strip().split(';LAYER_CHANGE')
     zipped_layers = zip(text_a_layers[1:], text_b_layers[1:])
     if not len(text_a_layers) == len(text_b_layers):
-        debug(text_a, text_b)
-        return [], [], 0, len(text_a_layers)
-        pdb.set_trace()
+        return "","", 0, len(text_a_layers)
+        # pdb.set_trace()
     assert len(text_a_layers) == len(text_b_layers)
     successes = 0
     failures = 0
