@@ -7,7 +7,8 @@ import argparse
 
 from preprocess_utils import debug, get_layers, make_json, \
                              get_data, relative_extrusion, \
-                             convert_strings_to_table
+                             convert_strings_to_table, \
+                             absolute_extrusion 
 from chunking import aligned_chunks
 from contour_flipping import flip_on_contours
 
@@ -73,9 +74,4 @@ if __name__=="__main__":
     parser.add_argument("--output_path", type=str, default="/vast/km3888/paired_gcode/chunked_data")
     args = parser.parse_args()
 
-    data = get_data(args.data_path,1)
-    layers = get_layers(data)
-    for layer_a,layer_b in layers[1:]:
-        processed = relative_extrusion(layer_a)
-        convert_strings_to_table(layer_a,processed)
-    # main(args)
+    main(args)

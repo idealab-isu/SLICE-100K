@@ -173,6 +173,23 @@ def get_data(data_path, n_files):
     
 
 def relative_extrusion(layer):
+    """
+    Converts absolute extrusion values in a G-code layer to relative extrusion values.
+
+    Each line of G-Code specifies extrusion at a given position. The extrusion values are absolute,
+    meaning they represent the total amount of filament extruded up to that point. 
+    What really matters though is the relativate extrusion value, how much new material is being
+    created at that location (since we'll be changing the ordering when we do contour flipping). 
+    
+    Args:
+        layer (str): The G-code layer to process.
+
+    Returns:
+        str: The processed G-code layer with relative extrusion values.
+
+    Raises:
+        AssertionError: If any of the relative extrusion values are not greater than zero.
+    """
     inks = layer.split('G92 E0')
     relative_inks = [inks[0]]
     for ink in inks[1:]:
@@ -223,7 +240,12 @@ def relative_extrusion(layer):
         relative_numbers_w_e = ["<e>" + str(number) + "<e>" for number in float_numbers]
         relative_ink = marked_ink
         for i in range(len(numbers)):
-            replace_val = f'<e>{str(relative_numbers[i])}<e>'
+            str_num = str(relative_numbers[i])
+            if "e" in str_num:
+                str_num = "{:f}".format(float(str_num))
+            replace_val = f'<e>{str_num}<e>'
+            if not all([x.isdigit() or x=="." for x in str_num]):
+                pdb.set_trace()
             relative_ink = relative_ink.replace(f'<e>{numbers[i]}<e>', replace_val)
             # print(f'<e>{numbers[i]}<e> -> {replace_val}')
         relative_inks.append(relative_ink)
@@ -233,65 +255,74 @@ def relative_extrusion(layer):
     return relative_layer
 
 def absolute_extrusion(layer):
-    #Recover original layer from relative extrusion
-    inks = layer.split('G92 E0')
-    absolute_inks = [inks[0]]
-    for ink in inks[1:]:
-        marked_lines = []
-        initialized = False
-        # demarkate all the relevant extrusion values in this ink
-        for line in ink.split('\n'):
-            #not sure whether lines including F should be included,
-            #I'll look at more examples:
-            if 'G1' in line and 'E' in line and (not 'F' in line or not initialized):
-                if 'F' in line:
-                    initialized = True
-                # convert line to array of characters
-                line_chars = list(line)
-                # find the index of the character 'E'
-                e_index = line_chars.index('E')
-                # find the index of the last consecutive digit following E
-                # e.g for E1922.293, the index of the last digit is 8
-                last_digit_index = e_index + 1
-                while last_digit_index < len(line) and (line[last_digit_index].isdigit() or line[last_digit_index] == '.'):
-                    last_digit_index += 1
-                # replace E<number> with E<number><e><e>
-                marked_line_chars = copy.deepcopy(line_chars)
-                marked_line_chars.insert(e_index+1, '<e>')
-                marked_line_chars.insert(last_digit_index + 1, '<e>')
-                # convert the array back to a string
-                marked_line = ''.join(marked_line_chars)
-                marked_lines.append(marked_line)
-            else:
-                marked_lines.append(line)
-        marked_ink = '\n'.join(marked_lines)
-        # now all the numbers n_1,n_2,...,n_k are marked with <e> around them
-        # what we want to do now is replace n_i with n_i + n_{i-1} for i>1 and n_1 with n_1
+    """
+    Converts a layer with relative extrusion values to absolute extrusion values.
 
-        # find all the marked numbers
-        numbers = re.findall(r'<e>[0-9]*\.?[0-9]*<e>', marked_ink)
+    Args:
+        layer (str): The layer with relative extrusion values.
+
+    Returns:
+        str: The layer with absolute extrusion values.
+    """
+    # Recover original layer from relative extrusion
+    relative_inks = layer.split('G92 E0')
+    absolute_inks = [relative_inks[0]]
+    for ink in relative_inks[1:]:
+        # get all the string portions surrounded by <e> tags
+        relative_values = re.findall(r'<e>[0-9]*\.?[0-9]*<e>', ink)
+        if len(relative_values) == 0:
+            absolute_inks.append(ink)
+            continue
         # remove the <e> tags
-        numbers = [number[3:-3] for number in numbers]
-        # convert the numbers to floats
-        float_numbers = [float(number) for number in numbers]
-        # compute the absolute extrusion
-        cum_sum = 0
-        absolute_numbers = []
-        for number in float_numbers:
-            cum_sum += number
-            absolute_numbers.append(cum_sum)
-        # replace the marked numbers with the absolute extrusion
-        assert all([x>0 for x in absolute_numbers])
-        absolute_numbers_w_e = ["<e>" + str(number) + "<e>" for number in float_numbers]
-        absolute_ink = marked_ink
+        relative_values_nums = [value[3:-3] for value in relative_values]
+        absolute_values = [float(relative_values_nums[0])]
+        for i in range(1, len(relative_values_nums)):
+            new_abs_val = absolute_values[-1] + float(relative_values_nums[i])
+            if len(str(new_abs_val).split('.')[1])>5:
+                old_abs_val = new_abs_val
+                new_abs_val_str = str(new_abs_val)
 
-        for i in range(len(numbers)):
-            replace_val = f'<e>{str(absolute_numbers[i])}<e>'
-            absolute_ink = absolute_ink.replace(f'<e>{numbers[i]}<e>', replace_val)
-            print(f'<e>{numbers[i]}<e> -> {replace_val}')
+                # check if value should be rounded up or down
+                if new_abs_val_str.split('.')[1][5] >= '5':
+                    new_abs_val = str(round(new_abs_val, 5))
+                else:
+                    new_abs_val = str(round(new_abs_val- 0.00001, 5))
+                new_abs_val = float(new_abs_val)
+                pdb.set_trace()
+            absolute_values.append(new_abs_val)
         
-        absolute_inks.append(absolute_ink)
-        convert_strings_to_table(ink, absolute_ink)
+        if (absolute_values[0] - int(absolute_values[0]) == 0):
+            absolute_values[0] = int(absolute_values[0])
+
+        if any([float(x) < 0 for x in relative_values_nums]):
+            print("Negative value found in relative extrusion")
+        # replace the relative values with the absolute values
+        for i in range(len(relative_values)):
+            #old code: this replaces all instances of the relative value with the absolute value
+            # ink = ink.replace(relative_values[i], str(absolute_values[i]))
+            #new code: this replaces only the first instance of the relative value with the absolute value
+            if not all([x.isdigit() or x == '.' for x in str(absolute_values[i])]):
+                print(f"Relative value {relative_values[i]} is not a number")
+                pdb.set_trace()
+            str_abs = str(absolute_values[i])
+            
+            ink = ink.replace(relative_values[i], str(absolute_values[i]), 1)
+        
+        if "<e>" in ink:
+            pdb.set_trace()
+        absolute_inks.append(ink)
+
     absolute_layer = 'G92 E0'.join(absolute_inks)
     return absolute_layer
 
+def test_extrusion(args):
+    data = get_data(args.data_path,1)
+    layers = get_layers(data)
+    for layer_a,layer_b in layers[1:]:
+        processed = relative_extrusion(layer_a)
+        unprocessed = absolute_extrusion(processed)
+        length=2500
+        convert_strings_to_table(layer_a[1900:length],unprocessed[1900:length])
+        if layer_a != unprocessed:
+            print('Error in relative extrusion')
+            pdb.set_trace()
