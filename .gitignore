@@ -7,3 +7,8 @@ debug_outputs/layer_a.gcode
 debug_outputs/layer_b_delimited.gcode
 debug_outputs/layer_b.gcode
 gcode_preprocessing/gcode_utils.py
+og_marlin.gcode
+debug_outputs/layer_a_delimited.gcode
+debug_outputs/layer_a.gcode
+debug_outputs/layer_b_delimited.gcode
+debug_outputs/layer_b.gcode

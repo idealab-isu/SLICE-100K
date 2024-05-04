@@ -6,9 +6,10 @@ import sys
 import argparse
 
 from preprocess_utils import debug, get_layers, make_json, \
-                             get_data, relative_extrusion, \
-                             convert_strings_to_table, \
-                             absolute_extrusion 
+                             get_data, \
+                             convert_strings_to_table
+                             
+from extrusion import  relative_extrusion, absolute_extrusion, test_extrusion
 from chunking import aligned_chunks
 from contour_flipping import flip_on_contours
 
@@ -74,4 +75,5 @@ if __name__=="__main__":
     parser.add_argument("--output_path", type=str, default="/vast/km3888/paired_gcode/chunked_data")
     args = parser.parse_args()
 
-    main(args)
+    # main(args)
+    test_extrusion(args)
