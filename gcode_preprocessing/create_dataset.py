@@ -5,11 +5,10 @@ import os
 import sys
 import argparse
 
-from preprocess_utils import debug, get_layers, make_json, \
-                             get_data, \
-                             convert_strings_to_table
+from preprocess_utils import debug, get_layers, \
+                             get_data,convert_strings_to_table
                              
-from extrusion import  relative_extrusion, absolute_extrusion, test_extrusion
+from extrusion import  relative_extrusion, test_extrusion
 from chunking import aligned_chunks
 from contour_flipping import flip_on_contours
 
@@ -28,7 +27,10 @@ def main(args):
         None
     """
     
+    # Marlin is "A"
+    # Sailfish is "B"
     data = get_data(args.data_path,args.n_files)
+
     # Re-arrange Marlin G-code so that the ordering of the contours 
     # is the same as in the Sailfish version
     aligned_gcode = []
@@ -37,6 +39,7 @@ def main(args):
     print('Performing contour flipping on %s files' % args.n_files)
     for i in tqdm(range(len(data))):
         gcode_a, gcode_b = data[i]
+        ex_a, ex_b = relative_extrusion(gcode_a, gcode_b)
         flipped_a,flipped_b,successes,failures = flip_on_contours(gcode_a,gcode_b)
         aligned_gcode.append((flipped_a,flipped_b))
         total_successes+=successes
@@ -53,27 +56,34 @@ def main(args):
     print('Creating chunks from %s layers' % len(layers_to_chunk))
     for i in tqdm(range(len(layers_to_chunk))):
         aligned_a,aligned_b = layers_to_chunk[i]
-        # chunks = aligned_chunks(aligned_a,aligned_b,args.chunk_size)  
         try:
-            chunks = aligned_chunks(aligned_a,aligned_b,args.chunk_size)
+            chunks = aligned_chunks(aligned_a,aligned_b,args.chunk_size,args.include_prev)
             chunk_list.extend(chunks)
             successes +=1
         except:
             failures+=1
     print(f'{successes}/{successes+failures} layers successfully chunked')
     print('Total number of chunks: %s' % len(chunk_list))
-    make_json(chunk_list)
+
+    out_path = os.path.join(args.output_dir, f"aligned_chunks_{args.n_files}_{args.chunk_size}.json")
+    if args.include_prev:
+        out_path = out_path.replace('.json', '_prev.json')
+    if args.relative_extrusion:
+        out_path = out_path.replace('.json', '_rel.json')
+    json.dump(chunk_list, open(out_path, 'w'))
     print('Made json file')
     print('Signing off...')
 
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--n_files", type=int, default=50)
+    parser.add_argument("--n_files", type=int, default=200)
     parser.add_argument("--chunk_size", type=int, default=20)
     parser.add_argument("--data_path", type=str, default="/vast/km3888/paired_gcode")
-    parser.add_argument("--output_path", type=str, default="/vast/km3888/paired_gcode/chunked_data")
+    parser.add_argument("--output_dir", type=str, default="/vast/km3888/paired_gcode/chunked_data")
+    parser.add_argument("--include_prev", action='store_true', default=False)
+    parser.add_argument("--relative_extrusion",action='store_true', default=False)
     args = parser.parse_args()
+    print(args)
 
-    # main(args)
-    test_extrusion(args)
+    main(args)

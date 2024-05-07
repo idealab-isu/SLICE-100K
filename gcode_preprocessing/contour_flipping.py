@@ -189,9 +189,6 @@ def flip_layer_on_contours(layer_a, layer_b):
     Returns:
         str: The full text content of layer_b after flipping 
     """
-    # Remove the absolute extrusion values and replace them with relative extrusion
-    layer_a = relative_extrusion(layer_a)
-    layer_b = relative_extrusion(layer_b)
     # Sometimes the first delimiter isn't recognized so we just get rid of the stuff before it and then tack that part
     # back on at the end
     content_a_before, layer_a, content_b_before, layer_b = insert_first_delimiter(layer_a, layer_b)
@@ -249,8 +246,6 @@ def flip_layer_on_contours(layer_a, layer_b):
     flipped_text = ''.join(flipped)
     full_text = content_a_before + flipped_text
     
-    full_text = absolute_extrusion(full_text)
-
     return full_text
 
 def flip_on_contours(text_a, text_b):
@@ -273,7 +268,6 @@ def flip_on_contours(text_a, text_b):
     zipped_layers = zip(text_a_layers[1:], text_b_layers[1:])
     if not len(text_a_layers) == len(text_b_layers):
         return "","", 0, len(text_a_layers)
-        # pdb.set_trace()
     assert len(text_a_layers) == len(text_b_layers)
     successes = 0
     failures = 0

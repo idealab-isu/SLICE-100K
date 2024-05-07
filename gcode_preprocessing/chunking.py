@@ -31,7 +31,7 @@ def find_same(text_a_lines,text_b_lines,i,start_j,max_lines):
             return j+start_j
     return -1
 
-def aligned_chunks(text_a, text_b, max_lines):
+def aligned_chunks(text_a, text_b, max_lines, include_prev=False):
     """
     Generate corresponding chunks of bounded length given two G-code files.
     Each pair of chunks is "aligned" meaning that all the 3D information present in one
@@ -93,5 +93,10 @@ def aligned_chunks(text_a, text_b, max_lines):
             start_i = end_i + 1
             start_j = end_j + 1
             end_i = min(start_i + max_lines, num_lines)
-
+    if include_prev:
+        chunks[0]["prev_1"] = ""
+        chunks[0]["prev_2"] = ""
+        for i in range(1, len(chunks)):
+            chunks[i]["prev_1"] = chunks[i - 1]["text_1"]
+            chunks[i]["prev_2"] = chunks[i - 1]["text_2"]
     return chunks

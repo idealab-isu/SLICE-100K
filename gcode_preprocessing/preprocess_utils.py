@@ -102,39 +102,6 @@ def chunk_debug(text_a_lines, text_b_lines, start_i, end_i, start_j, end_j, max_
     debug_b = "\n".join(debug_b_lines)
 
     debug(debug_a, debug_b)
-
-def make_json(chunk_list):
-    """
-    Converts a list of chunks into a JSON file.
-
-    Parameters:
-    - chunk_list (list): A list of dictionaries representing chunks.
-
-    Returns:
-    - None
-
-    Example Usage:
-    >>> chunks = [
-    ...     {"text_1": "G1 X10 Y20", "text_2": "G1 X20 Y30"},
-    ...     {"text_1": "G1 Z10", "text_2": "G1 Z20"}
-    ... ]
-    >>> make_json(chunks)
-
-    This function takes a list of chunks, where each chunk is a dictionary with two keys: "text_1" and "text_2".
-    It creates a new dictionary for each chunk, with a "text" key that contains a formatted string representing the chunk.
-    The formatted string includes the input and output texts from the chunk.
-    Finally, it writes the list of dictionaries to a JSON file.
-
-    Note: The JSON file path is hardcoded in the function and may need to be modified to match your desired location.
-    """
-    out_list = []
-    for chunk in chunk_list:
-        a = chunk["text_1"]
-        b = chunk["text_2"]
-        out_dict = {}
-        out_dict['text'] = f"Instruction: Translate the inputted GCode from Marlin to Sailfish \n Input:{a} \n Output:{b}" 
-        out_list.append(out_dict)
-    json.dump(out_list, open(f"/vast/km3888/paired_gcode/test_aligned_chunks_{args.n_files}_{args.chunk_size}.json", 'w'))
     
 def get_data(data_path, n_files):
     """

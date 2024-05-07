@@ -1,4 +1,4 @@
-from preprocess_utils import debug, get_layers, make_json, \
+from preprocess_utils import debug, get_layers, \
                                 get_data, \
                                 convert_strings_to_table
 import pdb
@@ -21,7 +21,6 @@ def sailfish_relative_extrusion(layer,init_val=None):
     number_i = 0
     # for each reset_i, find the list of number indices n_i such that 
     # reset_i is the last reset index that comes before it
-
     for i in range(len(reset_indices)):
         reset_i = reset_indices[i]
         # find the list of number indices n_i such that reset_i is the last reset index that comes before it
@@ -37,13 +36,18 @@ def sailfish_relative_extrusion(layer,init_val=None):
                 relative_inks.append(demarcated_layer[:reset_i])
         else:
             with_initial.append((resets[i-1], following_nums))
-    with_initial.append((resets[-1], numbers[number_i:]))
-    
+    if not len(reset_indices):
+        with_initial = [(init_val, numbers)]
+    else:
+        with_initial.append((resets[-1], numbers[number_i:]))
     for i in range(len(with_initial)):
         # these are basically their own "inks"
         if i==0 and len(relative_inks)==0:
             init_val, number_matches = with_initial[i]
-            relative_ink = demarcated_layer[:with_initial[i+1][0].start()]
+            if len(with_initial)>1 or len(reset_indices):
+                relative_ink = demarcated_layer[:with_initial[i+1][0].start()]
+            else:
+                relative_ink = demarcated_layer
         else:
             reset, number_matches = with_initial[i]
             init_val = float(reset.group(1))
@@ -54,7 +58,6 @@ def sailfish_relative_extrusion(layer,init_val=None):
             else:
                 next_reset = with_initial[i+1][0]
                 relative_ink = demarcated_layer[reset.start():next_reset.start()]
-
         
         numbers = [match.group(0) for match in number_matches]
         if not len(numbers):
@@ -84,7 +87,14 @@ def sailfish_relative_extrusion(layer,init_val=None):
 
         relative_inks.append(relative_ink)
     relative_layer = ''.join(relative_inks)
-    next_init_val = float(with_initial[-1][0].group(1))
+    options = []
+    if isinstance(with_initial[-1][0],float):
+        options.append(with_initial[-1][0])
+    else:
+        options.append(float(with_initial[-1][0].group(1)))
+    if len(float_numbers):
+        options.append(float_numbers[-1])
+    next_init_val = max(options)
     return relative_layer,next_init_val
 
 def sailfish_absolute_extrusion(layer,init_val=None):
@@ -190,7 +200,6 @@ def sailfish_absolute_extrusion(layer,init_val=None):
     next_init_val = float(with_initial[-1][0].group(1))
     return absolute_layer,next_init_val
 
-
 def demarcate_extrusion_vals(gcode, get_initial=True):
     marked_lines = []
     initialized = not get_initial
@@ -222,7 +231,7 @@ def demarcate_extrusion_vals(gcode, get_initial=True):
         marked_ink = '\n'.join(marked_lines)
     return marked_ink
 
-def relative_extrusion(layer):
+def marlin_relative_extrusion(layer):
     """
     Converts absolute extrusion values in a G-code layer to relative extrusion values.
 
@@ -240,8 +249,6 @@ def relative_extrusion(layer):
     Raises:
         AssertionError: If any of the relative extrusion values are not greater than zero.
     """
-    if 'G92 E0' not in layer:
-        layer = sailfish_relative_extrusion(layer)
     inks = layer.split('G92 E0')
     relative_inks = [inks[0]]
     for ink in inks[1:]:
@@ -279,7 +286,7 @@ def relative_extrusion(layer):
     debug(layer, relative_layer)
     return relative_layer
 
-def absolute_extrusion(layer):
+def marlin_absolute_extrusion(layer):
     """
     Converts a layer with relative extrusion values to absolute extrusion values.
 
@@ -289,8 +296,6 @@ def absolute_extrusion(layer):
     Returns:
         str: The layer with absolute extrusion values.
     """
-    if 'G92 E0' not in layer:
-        layer = sailfish_absolute_extrusion(layer)
     # Recover original layer from relative extrusion
     relative_inks = layer.split('G92 E0')
     absolute_inks = [relative_inks[0]]
@@ -341,6 +346,46 @@ def absolute_extrusion(layer):
 
     absolute_layer = 'G92 E0'.join(absolute_inks)
     return absolute_layer, None
+
+def relative_extrusion(marlin,sailfish):
+    layers = get_layers(zip([marlin],[sailfish]))
+
+    relative_marlin_layers = [layers[0][0]]
+    relative_sailfish_layers = [layers[0][1]]
+    init_val = None
+    for marlin_layer,sailfish_layer in layers[1:]:
+        relative_marlin = marlin_relative_extrusion(marlin_layer)
+        relative_sailfish, init_val = sailfish_relative_extrusion(sailfish_layer,init_val)
+
+        relative_marlin_layers.append((relative_marlin))
+        relative_sailfish_layers.append(relative_sailfish)
+    
+    # join the layers back into full files
+    relative_marlin_file = ''.join(relative_marlin_layers)
+    relative_sailfish_file = ''.join(relative_sailfish_layers)
+
+    return relative_marlin_file, relative_sailfish_file
+
+def absolute_extrusion(marlin,sailfish):
+    layers = get_layers(marlin,sailfish)
+
+    absolute_marlin_layers = []
+    absolute_sailfish_layers = []
+    for marlin_layer,sailfish_layer in layers:
+        marlin_layer = marlin_layers[i]
+        sailfish_layer = sailfish_layers[i]
+
+        absolute_marlin = marlin_absolute_extrusion(marlin_layer)
+        absolute_sailfish = sailfish_absolute_extrusion(sailfish_layer)
+
+        absolute_marlin_layers.append((marlin_layers, absolute_marlin))
+        absolute_sailfish_layers.append((sailfish_layers, absolute_sailfish))
+    
+    # join the layers back into full files
+    absolute_marlin_file = ';LAYER_CHANGE'.join(absolute_marlin_layers)
+    absolute_sailfish_file = ';LAYER_CHANGE'.join(absolute_sailfish_layers)
+
+    return absolute_marlin_file, absolute_sailfish_file
 
 def test_extrusion(args):
     data = get_data(args.data_path,1)
