@@ -5,7 +5,6 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel, GenerationConfig
 import prettytable
 import argparse
 import os
-from make_json_nlines import merge_list
 from transformers import LogitsProcessor, StoppingCriteria, StoppingCriteriaList
 import torch
 
@@ -24,6 +23,13 @@ class EOSStoppingCriteria(LogitsProcessor):
     def __len__(self):
         return 1
 
+def fixed_length_chunking(text,chunk_size):
+    text_lines = text.split('\n')
+    chunked_text = []
+    for i in range(0,len(text_lines),chunk_size):
+        chunk = text_lines[i:i+chunk_size]
+        chunked_text.append("\n".join(chunk))
+    return chunked_text
 
 def get_model(model_name):
     # Load your model and tokenizer
@@ -34,7 +40,8 @@ def get_model(model_name):
 
 def generate_text(model,tokenizer,starting_text):
     # Your input text (the first half of a text)
-    text_ids = tokenizer.encode(starting_text,return_tensors='pt')
+    model.to('cuda:0')
+    text_ids = tokenizer.encode(starting_text,return_tensors='pt').to(model.device)
     gen_config = GenerationConfig()
     gen_config.pad_token_id = 2
     # gen_config.eos_token_id = tokenizer.eos_token_id
@@ -58,6 +65,17 @@ def generate_text(model,tokenizer,starting_text):
     # num_lines = len(starting_gcode.split('\n'))
     generated_gcode = generated_text.split(' \n Output:')[1]
     return generated_gcode, starting_gcode
+
+def generate_text_parallel(model,tokenizer,texts):
+    text_id_list = []
+    for text in texts:
+        text_id = tokenizer.encode(text,return_tensors='pt')
+        text_id_list.append(text_id)
+    gen_config = GenerationConfig()
+    gen_config.pad_token_id = 2
+
+    text_ids = torch.cat(text_id_list,dim=0)
+
 
 def create_table(text1,text2):
     table = prettytable.PrettyTable()
@@ -96,20 +114,20 @@ def one_line_comparison(args):
         f.write('\n')
     print_tokens(start_gcode,generated_gcode)
 
-def get_layer():
+def get_layer(layer_idx=0):
     data_dir = "/vast/km3888/paired_gcode/thingiverse_10k_marlin"    
     data_path = os.listdir(data_dir)[-1]
     data_path = os.path.join(data_dir,data_path)
     g_code_file = open(data_path,'r').read()
-    layer = g_code_file.split(';LAYER_CHANGE')[1]
+    layer = g_code_file.split(';LAYER_CHANGE')[layer_idx]
     return layer
 
 def one_layer_comparison(args):
     model,tokenizer = get_model(args.model_path)
-    layer = get_layer()
+    layer = get_layer(layer_idx)
     layer_split = layer.split('\n')
     layer_split = [x + "\n" for x in layer_split[:-2]]+[layer_split[-1]]
-    layer_split = merge_list(layer_split,10)
+    layer_split = fixed_length_chunking(layer,20)
     output_layer = []
     print(f"{len(layer_split)} chunks")
     for chunk in layer_split:
@@ -118,7 +136,6 @@ def one_layer_comparison(args):
         if isinstance(output,tuple):
             output = output[0]
         output_layer.append(output)
-    pdb.set_trace()
     output_layer = "".join(output_layer)
     with open(f"{args.experiment_id}_output.gcode",'w') as f:
         f.write(output_layer)
@@ -129,8 +146,7 @@ def one_layer_comparison(args):
     # with open(f'output_{args.model_path}.txt','a') as f:
     #     f.write(str(table))
     #     f.write('\n')
-
-    pdb.set_trace()
+    return layer, output_layer
     
 def test_on_train_input(args):
     model,tokenizer = get_model(args.model_path)
