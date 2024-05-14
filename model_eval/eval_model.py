@@ -6,15 +6,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-def iou_list(pred, gt):
-    pred_layer_dict = parse_gcode(pred)
-    gt_layer_dict = parse_gcode(gt)
-    assert len(pred_layer_dict) == len(gt_layer_dict), "Number of layers do not match"
-
+def iou_list(pred_lst, gt_lst):
     iou_lst = []
-    for i in range(len(pred_layer_dict)):
-        pred_layer = plot_layer(pred_layer_dict,i)
-        gt_layer = plot_layer(gt_layer_dict,i)
+    for pred,gt in zip(pred_lst, gt_lst):
+        pred_layer_dict = parse_gcode(pred)
+        gt_layer_dict = parse_gcode(gt)
+        assert len(pred_layer_dict) == len(gt_layer_dict), "Number of layers do not match"
+        pred_layer = plot_layer(pred_layer_dict,0)
+        gt_layer = plot_layer(gt_layer_dict,0)
 
         # intersection = np.logical_and(pred, gt)
         intersection = pred_layer * gt_layer
@@ -45,10 +44,10 @@ if __name__=="__main__":
         gt_layer,pred_layer = one_layer_comparison(args.model_path,layer_idx)
         gt_layers.append(gt_layer)
         pred_layers.append(pred_layer)
-    
-    pred_gcode = ";LAYER_CHANGE".join(pred_layers)
-    gt_gcode = ";LAYER_CHANGE".join(gt_layers)
-    iou_lst = iou_list(pred_gcode, gt_gcode)
+    pdb.set_trace()
+    # pred_gcode = ";LAYER_CHANGE".join(pred_layers)
+    # gt_gcode = ";LAYER_CHANGE".join(gt_layers)
+    iou_lst = iou_list(pred_layers, gt_layers)
     iou_lst = np.array(iou_lst)
     print(iou_lst)
     print(f"IOU: {np.mean(iou_lst)}")
