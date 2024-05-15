@@ -353,9 +353,9 @@ def marlin_absolute_extrusion(layer):
     # Recover original layer from relative extrusion
     relative_inks = layer.split('G92 E0')
     absolute_inks = [relative_inks[0]]
-    if "<e>" not in layer:
-        layer = demarcate_extrusion_vals(layer, get_initial=False)
     for ink in relative_inks[1:]:
+        if "<e>" not in layer:
+            ink = demarcate_extrusion_vals(ink)
         # get all the string portions surrounded by <e> tags
         relative_values = re.findall(r'<e>[0-9]*\.?[0-9]*<e>', ink)
         if len(relative_values) == 0:
@@ -419,12 +419,15 @@ def relative_extrusion(marlin,sailfish):
         relative_marlin = marlin_relative_extrusion(marlin_layer)
         relative_sailfish, init_val = sailfish_relative_extrusion(sailfish_layer,init_val)
 
+
         relative_marlin_layers.append((relative_marlin))
         relative_sailfish_layers.append(relative_sailfish)
     
     # join the layers back into full files
     relative_marlin_file = ''.join(relative_marlin_layers)
     relative_sailfish_file = ''.join(relative_sailfish_layers)
+    relative_marlin_file = relative_marlin_file.replace("<e>","")
+    relative_sailfish_file = relative_sailfish_file.replace("<e>","")
 
     return relative_marlin_file, relative_sailfish_file
 
@@ -443,6 +446,8 @@ def absolute_extrusion(marlin,sailfish):
     # join the layers back into full files
     absolute_marlin_file = ''.join(absolute_marlin_layers)
     absolute_sailfish_file = ''.join(absolute_sailfish_layers)
+
+    absolute_marlin_file = re.sub(r'E(\d+)\.0\n', r'E\1\n', absolute_marlin_file)
 
     return absolute_marlin_file, absolute_sailfish_file
 
@@ -466,11 +471,23 @@ def test_extrusion(args):
             pdb.set_trace() #there's one layer where it hits this breakpoint but it's just a small rounding error
 
 def test_extrusion2(args):
-    for i in range(1,10):
-        data = get_data(args.data_path,i)
+    for idx in range(1,10):
+        data = get_data(args.data_path,idx)
         marlin,sailfish = data[0]
         relative_marlin, relative_sailfish = relative_extrusion(marlin,sailfish)
+        # i have a fun regex challenge for you
+        # if there's a string in the form <e>number<e> 
+        # where a number is a float but can be an integer without any loss of precision
+        # convert it to that integer
+        # so <e>3.0<e> should be converted to <e>3<e>
+        # but <e>3.1<e> should stay the same
+
+        alt_absolute_marlin, alt_absolute_sailfish = absolute_extrusion(relative_marlin,relative_sailfish)
+        relative_marlin_copy = relative_marlin
+        
         absolute_marlin, absolute_sailfish = absolute_extrusion(relative_marlin,relative_sailfish)
+        absolute_marlin_copy = absolute_marlin
+        
         if not absolute_marlin == marlin:
             # find first character that is not the same 
             print('Marlin')
