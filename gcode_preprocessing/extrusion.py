@@ -58,7 +58,6 @@ def sailfish_relative_extrusion(layer,init_val=None):
             else:
                 next_reset = with_initial[i+1][0]
                 relative_ink = demarcated_layer[reset.start():next_reset.start()]
-        
         numbers = [match.group(0) for match in number_matches]
         if not len(numbers):
             relative_inks.append(relative_ink)
@@ -74,9 +73,27 @@ def sailfish_relative_extrusion(layer,init_val=None):
         # replace the marked numbers with the relative extrusion
         assert all([x>0 for x in relatives])
 
+        # convert to string representation
+        str_nums = []
+        for i in range(len(relatives)):
+            # confusingly using "new_abs_val" to represent relative extrusion
+            # this is because I'm copying this part from sailfish_relative_extrusion
+            new_abs_val = relatives[i]
+            if len(str(new_abs_val).split('.')[1])>5:
+                # convert to rounded
+                old_abs_val = new_abs_val
+                new_abs_val_str = str(new_abs_val)
+
+                # check if value should be rounded up or down
+                if new_abs_val_str.split('.')[1][5] >= '5':
+                    new_abs_val = str(round(new_abs_val, 5))
+                else:
+                    new_abs_val = str(round(new_abs_val- 0.000001, 5))
+                new_abs_val = float(new_abs_val)
+            str_nums.append(str(new_abs_val))       
 
         for i in range(len(numbers)):
-            str_num = str(relatives[i])
+            str_num = str_nums[i]
             if "e" in str_num:
                 str_num = "{:f}".format(float(str_num))
             replace_val = f'<e>{str_num}<e>'
@@ -271,8 +288,28 @@ def marlin_relative_extrusion(layer):
         assert all([x>0 for x in relative_numbers])
         relative_numbers_w_e = ["<e>" + str(number) + "<e>" for number in float_numbers]
         relative_ink = marked_ink
+
+        str_nums = []
+        # convert to string representation
+        for i in range(len(relative_numbers)):
+            # confusingly using "new_abs_val" to represent relative extrusion
+            # this is because I'm copying this part from sailfish_relative_extrusion
+            new_abs_val = relative_numbers[i]
+            if len(str(new_abs_val).split('.')[1])>5:
+                # convert to rounded
+                old_abs_val = new_abs_val
+                new_abs_val_str = str(new_abs_val)
+
+                # check if value should be rounded up or down
+                if new_abs_val_str.split('.')[1][5] >= '5':
+                    new_abs_val = str(round(new_abs_val, 5))
+                else:
+                    new_abs_val = str(round(new_abs_val- 0.000001, 5))
+                new_abs_val = float(new_abs_val)
+            str_nums.append(str(new_abs_val))
+
         for i in range(len(numbers)):
-            str_num = str(relative_numbers[i])
+            str_num = str_nums[i]
             if "e" in str_num:
                 str_num = "{:f}".format(float(str_num))
             replace_val = f'<e>{str_num}<e>'
@@ -355,7 +392,9 @@ def relative_extrusion(marlin,sailfish):
     init_val = None
     for marlin_layer,sailfish_layer in layers[1:]:
         relative_marlin = marlin_relative_extrusion(marlin_layer)
+        pdb.set_trace()
         relative_sailfish, init_val = sailfish_relative_extrusion(sailfish_layer,init_val)
+        pdb.set_trace()
 
         relative_marlin_layers.append((relative_marlin))
         relative_sailfish_layers.append(relative_sailfish)
@@ -367,27 +406,25 @@ def relative_extrusion(marlin,sailfish):
     return relative_marlin_file, relative_sailfish_file
 
 def absolute_extrusion(marlin,sailfish):
-    layers = get_layers(marlin,sailfish)
+    layers = get_layers(zip([marlin],[sailfish]))
 
     absolute_marlin_layers = []
     absolute_sailfish_layers = []
-    for marlin_layer,sailfish_layer in layers:
-        marlin_layer = marlin_layers[i]
-        sailfish_layer = sailfish_layers[i]
-
-        absolute_marlin = marlin_absolute_extrusion(marlin_layer)
-        absolute_sailfish = sailfish_absolute_extrusion(sailfish_layer)
-
-        absolute_marlin_layers.append((marlin_layers, absolute_marlin))
-        absolute_sailfish_layers.append((sailfish_layers, absolute_sailfish))
+    init_val = None
+    for marlin_layer,sailfish_layer in layers[1:]:
+        absolute_marlin,_ = marlin_absolute_extrusion(marlin_layer)
+        absolute_sailfish,init_val = sailfish_absolute_extrusion(sailfish_layer,init_val)
+        absolute_marlin_layers.append(absolute_marlin)
+        absolute_sailfish_layers.append(absolute_sailfish)
     
     # join the layers back into full files
-    absolute_marlin_file = ';LAYER_CHANGE'.join(absolute_marlin_layers)
-    absolute_sailfish_file = ';LAYER_CHANGE'.join(absolute_sailfish_layers)
+    absolute_marlin_file = ''.join(absolute_marlin_layers)
+    absolute_sailfish_file = ''.join(absolute_sailfish_layers)
 
     return absolute_marlin_file, absolute_sailfish_file
 
 def test_extrusion(args):
+    pdb.set_trace()
     data = get_data(args.data_path,1)
     layers = get_layers(data)
     init_val = None
@@ -404,3 +441,17 @@ def test_extrusion(args):
                     print(f'Error at index {i}') 
                     break
             pdb.set_trace() #there's one layer where it hits this breakpoint but it's just a small rounding error
+
+def test_extrusion2(args):
+    data = get_data(args.data_path,1)
+    marlin,sailfish = data[0]
+    relative_marlin, relative_sailfish = relative_extrusion(marlin,sailfish)
+    absolute_marlin, absolute_sailfish = absolute_extrusion(relative_marlin,relative_sailfish)
+    pdb.set_trace()
+
+if __name__=="__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description='Test extrusion functions')
+    parser.add_argument('--data_path', type=str,default="/vast/km3888/paired_gcode", help='Path to the data folder')
+    args = parser.parse_args()
+    test_extrusion2(args)
