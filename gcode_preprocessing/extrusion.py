@@ -115,6 +115,8 @@ def sailfish_relative_extrusion(layer,init_val=None):
     return relative_layer,next_init_val
 
 def sailfish_absolute_extrusion(layer,init_val=None):
+    if "<e>" not in layer:
+        layer = demarcate_extrusion_vals(layer, get_initial=False)
     resets = re.finditer(r'G1 E([0-9\.]+) F([0-9]+)', layer)
     resets = [match for match in resets]
     reset_indices = [match.start() for match in resets]
@@ -184,8 +186,20 @@ def sailfish_absolute_extrusion(layer,init_val=None):
         float_numbers = [float(number) for number in numbers_stripped]
         # compute the absolute extrusion
         absolutes = [init_val + float_numbers[0]]
+        if len(str(absolutes[0]).split('.')[1])>5:
+            old_abs_val = absolutes[0]
+            new_abs_val_str = str(absolutes[0])
+
+            # check if value should be rounded up or down
+            if new_abs_val_str.split('.')[1][5] >= '5':
+                absolutes[0] = str(round(absolutes[0], 5))
+            else:
+                absolutes[0] = str(round(absolutes[0]- 0.000001, 5))
+            absolutes[0] = float(absolutes[0])
+        
         for i in range(1, len(float_numbers)):
             new_abs_val = absolutes[-1] + float_numbers[i]
+
             if len(str(new_abs_val).split('.')[1])>5:
                 old_abs_val = new_abs_val
                 new_abs_val_str = str(new_abs_val)
@@ -194,7 +208,7 @@ def sailfish_absolute_extrusion(layer,init_val=None):
                 if new_abs_val_str.split('.')[1][5] >= '5':
                     new_abs_val = str(round(new_abs_val, 5))
                 else:
-                    new_abs_val = str(round(new_abs_val- 0.00001, 5))
+                    new_abs_val = str(round(new_abs_val- 0.000001, 5))
                 new_abs_val = float(new_abs_val)
             absolutes.append(new_abs_val)
             # replace the marked numbers with the absolute extrusion
@@ -206,7 +220,8 @@ def sailfish_absolute_extrusion(layer,init_val=None):
             str_abs = str(absolutes[i])
             
             absolute_ink = absolute_ink.replace(numbers[i], str(absolutes[i]), 1)
-        
+        if "E603.73536" in absolute_ink:
+            pdb.set_trace()
         if "<e>" in absolute_ink:
             pdb.set_trace()
         absolute_inks.append(absolute_ink)
@@ -215,6 +230,8 @@ def sailfish_absolute_extrusion(layer,init_val=None):
     if '<e>' in absolute_layer:
         pdb.set_trace()
     next_init_val = float(with_initial[-1][0].group(1))
+    if len(with_initial[-1][1])>0:
+        next_init_val = absolutes[i]
     return absolute_layer,next_init_val
 
 def demarcate_extrusion_vals(gcode, get_initial=True):
@@ -336,6 +353,8 @@ def marlin_absolute_extrusion(layer):
     # Recover original layer from relative extrusion
     relative_inks = layer.split('G92 E0')
     absolute_inks = [relative_inks[0]]
+    if "<e>" not in layer:
+        layer = demarcate_extrusion_vals(layer, get_initial=False)
     for ink in relative_inks[1:]:
         # get all the string portions surrounded by <e> tags
         relative_values = re.findall(r'<e>[0-9]*\.?[0-9]*<e>', ink)
@@ -355,9 +374,15 @@ def marlin_absolute_extrusion(layer):
                 if new_abs_val_str.split('.')[1][5] >= '5':
                     new_abs_val = str(round(new_abs_val, 5))
                 else:
-                    new_abs_val = str(round(new_abs_val- 0.00001, 5))
+                    new_abs_val = str(round(new_abs_val- 0.000001, 5))
                 new_abs_val = float(new_abs_val)
+            if str(new_abs_val) == 30.95565 or str(new_abs_val) ==30.95566:
+                print('found her')
                 pdb.set_trace()
+            if new_abs_val == 30.95565 or new_abs_val ==30.95566:
+                print('found her')
+                pdb.set_trace()
+
             absolute_values.append(new_abs_val)
         
         if (absolute_values[0] - int(absolute_values[0]) == 0):
@@ -392,9 +417,7 @@ def relative_extrusion(marlin,sailfish):
     init_val = None
     for marlin_layer,sailfish_layer in layers[1:]:
         relative_marlin = marlin_relative_extrusion(marlin_layer)
-        pdb.set_trace()
         relative_sailfish, init_val = sailfish_relative_extrusion(sailfish_layer,init_val)
-        pdb.set_trace()
 
         relative_marlin_layers.append((relative_marlin))
         relative_sailfish_layers.append(relative_sailfish)
@@ -408,8 +431,8 @@ def relative_extrusion(marlin,sailfish):
 def absolute_extrusion(marlin,sailfish):
     layers = get_layers(zip([marlin],[sailfish]))
 
-    absolute_marlin_layers = []
-    absolute_sailfish_layers = []
+    absolute_marlin_layers = [layers[0][0]]
+    absolute_sailfish_layers = [layers[0][1]]
     init_val = None
     for marlin_layer,sailfish_layer in layers[1:]:
         absolute_marlin,_ = marlin_absolute_extrusion(marlin_layer)
@@ -443,10 +466,30 @@ def test_extrusion(args):
             pdb.set_trace() #there's one layer where it hits this breakpoint but it's just a small rounding error
 
 def test_extrusion2(args):
-    data = get_data(args.data_path,1)
-    marlin,sailfish = data[0]
-    relative_marlin, relative_sailfish = relative_extrusion(marlin,sailfish)
-    absolute_marlin, absolute_sailfish = absolute_extrusion(relative_marlin,relative_sailfish)
+    for i in range(1,10):
+        data = get_data(args.data_path,i)
+        marlin,sailfish = data[0]
+        relative_marlin, relative_sailfish = relative_extrusion(marlin,sailfish)
+        absolute_marlin, absolute_sailfish = absolute_extrusion(relative_marlin,relative_sailfish)
+        if not absolute_marlin == marlin:
+            # find first character that is not the same 
+            print('Marlin')
+            for i in range(len(absolute_marlin)):
+                if absolute_marlin[i] != marlin[i]:
+                    print(f"First difference at index {i}")
+                    print(f"Absolute: {absolute_marlin[i]}")
+                    print(f"Original: {marlin[i]}")
+                    pdb.set_trace()
+                    break
+        # do same for sailfish
+        if not absolute_sailfish == sailfish:
+            print('sailfish')
+            for i in range(len(absolute_sailfish)):
+                if absolute_sailfish[i] != sailfish[i]:
+                    print(f"First difference at index {i}")
+                    print(f"Absolute: {absolute_sailfish[i]}")
+                    print(f"Original: {sailfish[i]}")
+                    pdb.set_trace()
     pdb.set_trace()
 
 if __name__=="__main__":
