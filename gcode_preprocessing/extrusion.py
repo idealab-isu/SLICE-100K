@@ -1,6 +1,7 @@
-from preprocess_utils import debug, get_layers, \
+from gcode_preprocessing.preprocess_utils import debug, get_layers, \
                                 get_data, \
                                 convert_strings_to_table
+
 import pdb
 import re
 import copy
@@ -220,10 +221,6 @@ def sailfish_absolute_extrusion(layer,init_val=None):
             str_abs = str(absolutes[i])
             
             absolute_ink = absolute_ink.replace(numbers[i], str(absolutes[i]), 1)
-        if "E603.73536" in absolute_ink:
-            pdb.set_trace()
-        if "<e>" in absolute_ink:
-            pdb.set_trace()
         absolute_inks.append(absolute_ink)
     absolute_layer = ''.join(absolute_inks)
     absolute_layer = absolute_layer.replace('E0.', 'E.')
@@ -376,12 +373,6 @@ def marlin_absolute_extrusion(layer):
                 else:
                     new_abs_val = str(round(new_abs_val- 0.000001, 5))
                 new_abs_val = float(new_abs_val)
-            if str(new_abs_val) == 30.95565 or str(new_abs_val) ==30.95566:
-                print('found her')
-                pdb.set_trace()
-            if new_abs_val == 30.95565 or new_abs_val ==30.95566:
-                print('found her')
-                pdb.set_trace()
 
             absolute_values.append(new_abs_val)
         
@@ -402,8 +393,6 @@ def marlin_absolute_extrusion(layer):
             
             ink = ink.replace(relative_values[i], str(absolute_values[i]), 1)
         
-        if "<e>" in ink:
-            pdb.set_trace()
         absolute_inks.append(ink)
 
     absolute_layer = 'G92 E0'.join(absolute_inks)

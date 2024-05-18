@@ -1,5 +1,5 @@
 import pdb
-from preprocess_utils import debug
+from gcode_preprocessing.preprocess_utils import debug
 
 def remove_nums(s):
     """

@@ -5,7 +5,7 @@ import os
 import sys
 import argparse
 
-from preprocess_utils import debug, get_layers, \
+from gcode_preprocessing.preprocess_utils import debug, get_layers, \
                              get_data,convert_strings_to_table
                              
 from extrusion import  relative_extrusion, test_extrusion
@@ -39,7 +39,8 @@ def main(args):
     print('Performing contour flipping on %s files' % args.n_files)
     for i in tqdm(range(len(data))):
         gcode_a, gcode_b = data[i]
-        ex_a, ex_b = relative_extrusion(gcode_a, gcode_b)
+        if args.relative_extrusion:
+            gcode_a, gcode_b = relative_extrusion(gcode_a, gcode_b)
         flipped_a,flipped_b,successes,failures = flip_on_contours(gcode_a,gcode_b)
         aligned_gcode.append((flipped_a,flipped_b))
         total_successes+=successes

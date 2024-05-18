@@ -1,5 +1,5 @@
 import pdb
-from preprocess_utils import debug, chunk_debug
+from gcode_preprocessing.preprocess_utils import debug, chunk_debug
 
 def find_same(text_a_lines,text_b_lines,i,start_j,max_lines):
     """
@@ -44,7 +44,7 @@ def aligned_chunks(text_a, text_b, max_lines, include_prev=False):
 
     Args:
         text_a (str): G-code file in flavor A (e.g Marlin)
-        text_b (str): G-code file in flavor B (.eg Sailfish)
+        text_b (str): G-code file in flavor B (e.g Sailfish)
         max_lines (int): The maximum number of lines in each chunk.
 
     Returns:
