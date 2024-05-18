@@ -48,7 +48,7 @@ def generate_text(model,tokenizer,starting_text):
     # Generate a sequence of text
     stopping_criteria_eos = EOSStoppingCriteria(tokenizer.eos_token_id)
     stopping_criteria = StoppingCriteriaList([stopping_criteria_eos])
-    output = model.generate(text_ids, generation_config=gen_config, num_return_sequences=5, \
+    output = model.generate(text_ids, generation_config=gen_config, num_return_sequences=1, \
         temperature=0.7,output_scores=True,stopping_criteria=stopping_criteria, length_penalty=-1.0, \
         return_dict_in_generate=True,max_length=1023,do_sample=True,num_beams=5,top_k=5)
     # print('gen length:',output[0].shape[1])
@@ -59,6 +59,7 @@ def generate_text(model,tokenizer,starting_text):
     # eos_diff = pred_maxes - pred_eos
     # print('eos diff max:',eos_diff.min())
     # pdb.set_trace()
+    pdb.set_trace()
     generated_text = tokenizer.decode(output[0][-1].tolist(), skip_special_tokens=True)
     # Strip the instructions and input text from the generated code
     starting_gcode = starting_text.strip("Instruction: Translate the inputted GCode from Marlin to Sailfish and stop after one line \n ").strip(" \n Output: \n")
@@ -115,34 +116,34 @@ def one_line_comparison(args):
     print_tokens(start_gcode,generated_gcode)
 
 def get_layer(layer_idx=0):
-    data_dir = "/vast/km3888/paired_gcode/thingiverse_10k_marlin"    
-    data_path = os.listdir(data_dir)[-1]
-    data_path = os.path.join(data_dir,data_path)
-    g_code_file = open(data_path,'r').read()
-    layer = g_code_file.split(';LAYER_CHANGE')[layer_idx]
+    sailfish_data_dir = "/vast/km3888/paired_gcode/thingiverse_10k_sailfish"  
+    marlin_data_dir = "/vast/km3888/paired_gcode/thingiverse_10k_marlin"
+    data_path = os.listdir(sailfish_data_dir)[-1]
+    sailfish_data_path = os.path.join(data_dir,data_path)
+    marlin_data_path = os.path.join(marlin_data_dir,data_path)
+
+
+    sailfish_file = open(sailfish_data_path,'r').read()
+    marlin_file = open(marlin_data_path,'r').read()
+
+    sailfish_layer = sailfish_file.split(';LAYER_CHANGE')[layer_idx]
+    marlin_layer = marlin_file.split(';LAYER_CHANGE')[layer_idx]
     return layer
 
-def one_layer_comparison(args):
-    model,tokenizer = get_model(args.model_path)
-    layer = get_layer(layer_idx)
+def one_layer_comparison(model_path,layer):
+    model,tokenizer = get_model(model_path)
     layer_split = layer.split('\n')
     layer_split = [x + "\n" for x in layer_split[:-2]]+[layer_split[-1]]
     layer_split = fixed_length_chunking(layer,20)
     output_layer = []
-    print(f"{len(layer_split)} chunks")
     for chunk in layer_split:
         starting_text = "Instruction: Translate the inputted GCode from Marlin to Sailfish \n Input: %s \n Output:" % chunk
         output = generate_text(model,tokenizer,starting_text)
+        pdb.set_trace()
         if isinstance(output,tuple):
             output = output[0]
         output_layer.append(output)
     output_layer = "".join(output_layer)
-    with open(f"{args.experiment_id}_output.gcode",'w') as f:
-        f.write(output_layer)
-        f.write('\n')
-    with open(f"{args.experiment_id}_input.gcode",'w') as f:
-        f.write(layer)
-        f.write('\n')
     # with open(f'output_{args.model_path}.txt','a') as f:
     #     f.write(str(table))
     #     f.write('\n')
@@ -164,6 +165,38 @@ def test_on_train_input(args):
         # print(eos_probs.squeeze()[-1])
         print(eos_probs.max())
 
+def multi_layer_translation(model_path,layers):
+    # get model and tokenizer
+    model,tokenizer = get_model(model_path)
+    # model.to('cuda:0')
+    #preprocess layers into text chunks
+    chunks = []
+    layer_lengths = []
+    for layer in layers:
+        layer_split = layer.split('\n')
+        layer_split = [x + "\n" for x in layer_split[:-2]]+[layer_split[-1]]
+        layer_split = fixed_length_chunking(layer,20)
+        for chunk in layer_split:
+            chunks.append(chunk)
+        layer_lengths.append(len(layer_split))
+    input_chunks = ["Instruction: Translate the inputted GCode from Marlin to Sailfish \n Input: %s \n Output:" % chunk for chunk in chunks]
+    
+    text_ids = [tokenizer.encode(chunk,return_tensors='pt',padding="max_length", max_length=1024).to(model.device) for chunk in input_chunks]
+    text_ids = torch.cat(text_ids,dim=0)
+    gen_config = GenerationConfig()
+    gen_config.pad_token_id = 2
+    # gen_config.eos_token_id = tokenizer.eos_token_id
+    # Generate a sequence of text
+    stopping_criteria_eos = EOSStoppingCriteria(tokenizer.eos_token_id)
+    stopping_criteria = StoppingCriteriaList([stopping_criteria_eos])
+    output = model.generate(text_ids, generation_config=gen_config, num_return_sequences=5, \
+        temperature=0.7,output_scores=True,stopping_criteria=stopping_criteria, length_penalty=-1.0, \
+        return_dict_in_generate=True,max_length=1023,do_sample=True,num_beams=5,top_k=5)
+
+    pdb.set_trace()
+    pass
+
+
 if __name__=="__main__":
 
     parser = argparse.ArgumentParser()
@@ -171,12 +204,20 @@ if __name__=="__main__":
     # parser.add_argument('--model_path',default="/scratch/km3888/gcode_peft/45428360_1/checkpoint-4500",type=str)
     # parser.add_argument('--model_path',default="openai-community/gpt2",type=str)
     # parser.add_argument('--model_path',default="/scratch/km3888/gcode_peft/45497828_0/checkpoint_500",type=str)
-    parser.add_argument('--model_path',default="/scratch/km3888/gcode_peft/45516626_1/checkpoint-1000",type=str)
+    parser.add_argument('--model_path',default="/scratch/km3888/gcode_peft/46465152_0/checkpoint-100/",type=str)
 
     args = parser.parse_args()
+
     experiment_id = args.model_path.split('/')[-2]
     args.experiment_id = experiment_id
     args.out_file = f'output_{experiment_id}.txt'
     # one_line_comparison(args)
-    one_layer_comparison(args)
+    # one_layer_comparison(args,args.model_path)
+    layers = []
+    layer_1 = get_layer(1)
+    layers.append(layer_1)
+    layer_2 = get_layer(2)
+    layers.append(layer_2)
+
+    multi_layer_translation(args.model_path,layers)
     # test_on_train_input(args)
