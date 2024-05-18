@@ -1,5 +1,8 @@
 debug_outputs/*
+debug_outputs
 __pycache__/*
+*.pyc
+__pycache__
 */__pycache__/*
 debug_outputs/layer_a_delimited.gcode
 debug_outputs/layer_a_delimited.gcode
@@ -12,3 +15,12 @@ debug_outputs/layer_a_delimited.gcode
 debug_outputs/layer_a.gcode
 debug_outputs/layer_b_delimited.gcode
 debug_outputs/layer_b.gcode
+slurm/*
+renders/*
+45337768_0_input.gcode
+45337768_0_output.gcode
+45337768_1_input.gcode
+45337768_1_output.gcode
+*.gcode
+*.out
+*.err

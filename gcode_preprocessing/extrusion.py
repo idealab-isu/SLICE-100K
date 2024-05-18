@@ -260,6 +260,7 @@ def demarcate_extrusion_vals(gcode, get_initial=True):
         else:
             marked_lines.append(line)
         marked_ink = '\n'.join(marked_lines)
+    marked_ink = marked_ink.replace("<e><e>","")
     return marked_ink
 
 def marlin_relative_extrusion(layer):

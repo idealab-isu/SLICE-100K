@@ -9,7 +9,7 @@ def parse_gcode(gcode):
     last_x, last_y = None, None  # Track the last position
     skip = True  # Start with skipping until 'Skirt/Brim' is found
     is_extruding = False  # Track whether the current move involves extrusion
-
+    
     for line in gcode.split('\n'):
         if ';TYPE:Skirt/Brim' in line:
             skip = False
@@ -38,6 +38,12 @@ def parse_gcode(gcode):
             # Store the position if this is an extrusion move or first move on this layer
             if is_extruding and x is not None and y is not None:
                 if current_z not in layer_dict:
+                    if current_z is None:
+                        # use regex to find the Z value (e.g Z:0.65 should be 0.65)
+                        try:
+                            current_z = float(re.search(r'Z:([0-9]+\.?[0-9]*)', gcode).group(1))
+                        except:
+                            pdb.set_trace()
                     layer_dict[current_z] = []
                 if last_x is not None and last_y is not None:  # Avoid adding the very first uninitialized point
                     layer_dict[current_z].append((last_x, last_y, x, y))
@@ -47,7 +53,7 @@ def parse_gcode(gcode):
 
     return layer_dict
 
-def plot_layer(layer_dict, layer_num=None):
+def plot_layer(layer_dict,render_path, layer_num=None):
     layer_num = int(layer_num)
     if None in layer_dict:
         layer_dict[-1] = layer_dict[None]
@@ -67,9 +73,9 @@ def plot_layer(layer_dict, layer_num=None):
             # plt.plot([x1, x2], [y1, y2], label=f'Layer {z}' if len(layer_dict) == 1 else "")
 
     plt.title(f'G-code Layer Visualization - Layer {layer_num}' if layer_num else 'All Layers')
-    plt.savefig(f"renders/gcode_layer_{layer_num}.png")
+    plt.savefig(render_path)
     
-    img = plt.imread(f"renders/gcode_layer_{layer_num}.png")
+    img = plt.imread(render_path)
     #load image back as binary array and convert to numpy array
     img = np.array(img)
     return img [:,:,0]
@@ -80,7 +86,6 @@ if __name__ == "__main__":
     #load gcode from gcode_path
     gcode = open(gcode_path, 'r').read()
     gcode_layers = parse_gcode(gcode)
-    print(gcode_layers.keys())
 
     # Visualize the layers
     lyr_input = input("Enter the layer number to visualize: ")
