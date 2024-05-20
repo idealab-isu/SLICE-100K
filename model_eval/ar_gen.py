@@ -58,24 +58,12 @@ def generate_text(model,tokenizer,starting_text):
     # pred_eos = predicted_logits[:,:,-1]
     # eos_diff = pred_maxes - pred_eos
     # print('eos diff max:',eos_diff.min())
-    # pdb.set_trace()
-    pdb.set_trace()
     generated_text = tokenizer.decode(output[0][-1].tolist(), skip_special_tokens=True)
     # Strip the instructions and input text from the generated code
     starting_gcode = starting_text.strip("Instruction: Translate the inputted GCode from Marlin to Sailfish and stop after one line \n ").strip(" \n Output: \n")
     # num_lines = len(starting_gcode.split('\n'))
     generated_gcode = generated_text.split(' \n Output:')[1]
     return generated_gcode, starting_gcode
-
-def generate_text_parallel(model,tokenizer,texts):
-    text_id_list = []
-    for text in texts:
-        text_id = tokenizer.encode(text,return_tensors='pt')
-        text_id_list.append(text_id)
-    gen_config = GenerationConfig()
-    gen_config.pad_token_id = 2
-
-    text_ids = torch.cat(text_id_list,dim=0)
 
 
 def create_table(text1,text2):
@@ -139,7 +127,6 @@ def one_layer_comparison(model_path,layer):
     for chunk in layer_split:
         starting_text = "Instruction: Translate the inputted GCode from Marlin to Sailfish \n Input: %s \n Output:" % chunk
         output = generate_text(model,tokenizer,starting_text)
-        pdb.set_trace()
         if isinstance(output,tuple):
             output = output[0]
         output_layer.append(output)
@@ -164,37 +151,6 @@ def test_on_train_input(args):
         eos_probs = torch.softmax(model_preds,dim=-1)[:,:,-1]
         # print(eos_probs.squeeze()[-1])
         print(eos_probs.max())
-
-def multi_layer_translation(model_path,layers):
-    # get model and tokenizer
-    model,tokenizer = get_model(model_path)
-    # model.to('cuda:0')
-    #preprocess layers into text chunks
-    chunks = []
-    layer_lengths = []
-    for layer in layers:
-        layer_split = layer.split('\n')
-        layer_split = [x + "\n" for x in layer_split[:-2]]+[layer_split[-1]]
-        layer_split = fixed_length_chunking(layer,20)
-        for chunk in layer_split:
-            chunks.append(chunk)
-        layer_lengths.append(len(layer_split))
-    input_chunks = ["Instruction: Translate the inputted GCode from Marlin to Sailfish \n Input: %s \n Output:" % chunk for chunk in chunks]
-    
-    text_ids = [tokenizer.encode(chunk,return_tensors='pt',padding="max_length", max_length=1024).to(model.device) for chunk in input_chunks]
-    text_ids = torch.cat(text_ids,dim=0)
-    gen_config = GenerationConfig()
-    gen_config.pad_token_id = 2
-    # gen_config.eos_token_id = tokenizer.eos_token_id
-    # Generate a sequence of text
-    stopping_criteria_eos = EOSStoppingCriteria(tokenizer.eos_token_id)
-    stopping_criteria = StoppingCriteriaList([stopping_criteria_eos])
-    output = model.generate(text_ids, generation_config=gen_config, num_return_sequences=5, \
-        temperature=0.7,output_scores=True,stopping_criteria=stopping_criteria, length_penalty=-1.0, \
-        return_dict_in_generate=True,max_length=1023,do_sample=True,num_beams=5,top_k=5)
-
-    pdb.set_trace()
-    pass
 
 
 if __name__=="__main__":

@@ -1,5 +1,5 @@
 from ar_gen import one_layer_comparison
-from gcode_render import parse_gcode, plot_layer
+from gcode_render import parse_gcode, plot_layer, plot_layer_rectangle
 import argparse
 import pdb
 import numpy as np
@@ -9,29 +9,8 @@ from tqdm import tqdm
 import random
 import copy
 import re
-from gcode_preprocessing import sailfish_relative_extrusion, marlin_relative_extrusion, sailfish_absolute_extrusion, marlin_absolute_extrusion
+from gcode_preprocessing import absolute_extrusion, relative_extrusion, get_layers, marlin_absolute_extrusion
 random.seed(42)
-
-def get_eval_layers():
-    sailfish_data_dir = "/vast/km3888/paired_gcode/thingiverse_10k_sailfish"  
-    marlin_data_dir = "/vast/km3888/paired_gcode/thingiverse_10k_marlin"
-
-    data_files = os.listdir(sailfish_data_dir)
-    eval_data_files = data_files[6000:6010]
-    output_layers = []
-    for i,data_path in enumerate(eval_data_files):
-        sailfish_data_path = os.path.join(sailfish_data_dir,data_path)
-        marlin_data_path = sailfish_data_path.replace("sailfish","marlin")
-
-        sailfish_file = open(sailfish_data_path,'r').read()
-        marlin_file = open(marlin_data_path,'r').read()
-
-        sailfish_layers = sailfish_file.split(';LAYER_CHANGE')
-        marlin_layers = marlin_file.split(';LAYER_CHANGE')
-
-        combined_layers = list(zip(sailfish_layers,marlin_layers))
-        output_layers.extend(combined_layers[1:])
-    return output_layers
 
 def get_eval_shapes(num_files=10):
     sailfish_data_dir = "/vast/km3888/paired_gcode/thingiverse_10k_sailfish"  
@@ -51,16 +30,19 @@ def get_eval_shapes(num_files=10):
     
     return output_shapes
 
-def iou_list(pred_lst, gt_lst,experiment_id):
+def iou_list(pred_lst, gt_lst,output_dir):
     iou_lst = []
     for i,(pred,gt) in enumerate(zip(pred_lst, gt_lst)):
-        if i==6:
-            pdb.set_trace()
         pred_layer_dict = parse_gcode(pred)
         gt_layer_dict = parse_gcode(gt)
+        if not len(pred_layer_dict):
+            continue
+        assert all([x is not None for x in pred_layer_dict.keys()])
         assert len(pred_layer_dict) == len(gt_layer_dict), "Number of layers do not match"
-        pred_layer = plot_layer(pred_layer_dict,str(i)+"_pred_"+experiment_id,0)
-        gt_layer = plot_layer(gt_layer_dict,str(i)+"_gt_"+experiment_id,0)
+        gt_path = os.path.join(output_dir,str(i)+"_gt_rec.png")
+        pred_path = os.path.join(output_dir,str(i)+"_pred_rec.png")
+        pred_layer = plot_layer_rectangle(pred_layer_dict,pred_path)
+        gt_layer = plot_layer_rectangle(gt_layer_dict,gt_path)
 
         # intersection = np.logical_and(pred, gt)
         intersection = pred_layer * gt_layer
@@ -74,74 +56,66 @@ def iou_list(pred_lst, gt_lst,experiment_id):
 
 def iou_stats(iou_lst):
     iou_lst = np.array(iou_lst)
-    print(iou_lst)
-    print(f"IOU: {np.mean(iou_lst)}")
-    print(f"Median IOU: {np.median(iou_lst)}")
-    print(f"Max IOU: {np.max(iou_lst)}")
-    print(f"Min IOU: {np.min(iou_lst)}")
-    print(f"Std IOU: {np.std(iou_lst)}")
-    print(f"Variance IOU: {np.var(iou_lst)}")
-    print(f"IOU list: {iou_lst}")
-    print(f"Number of layers: {len(iou_lst)}")
+    stats = {
+    "IOU": np.mean(iou_lst),
+    "Median IOU": np.median(iou_lst),
+    "Max IOU": np.max(iou_lst),
+    "Min IOU": np.min(iou_lst),
+    "Std IOU": np.std(iou_lst),
+    "Variance IOU": np.var(iou_lst),
+    "IOU list": iou_lst,
+    "Number of layers": len(iou_lst)
+    }
+    return stats
 
-    plt.figure(figsize=(10, 8))
-    plt.hist(iou_lst, bins=20, color='blue', alpha=0.7)
-    plt.title('IOU Distribution')
-    plt.xlabel('IOU')
-    plt.ylabel('Frequency')
-    plt.savefig("renders/iou_distribution.png")
-    img = plt.imread("renders/iou_distribution.png")
-    img = np.array(img)
-    img = img[:, :, 0]
-    plt.imshow(img)
-    plt.show()
-    print("IOU distribution saved as renders/iou_distribution.png")
-    print("Done!")
-
-def do_eval(model_path,num_layers,rel,experiment_id):
-    eval_layers = get_eval_layers()
-    # random.shuffle(eval_layers)
+def do_eval(model_path,num_layers,rel,output_dir):
+    eval_shapes = get_eval_shapes()
+    eval_layers = []
+    # Get relative layers to sample from
+    for shape_idx in range(len(eval_shapes)):
+        sailfish_shape,marlin_shape = eval_shapes[shape_idx]
+        abs_eval_layers = get_layers([(sailfish_shape,marlin_shape)])[1:]
+        relative_marlin,relative_sailfish = relative_extrusion(marlin_shape,sailfish_shape)
+        rel_eval_layers = get_layers([(relative_sailfish,relative_marlin)])[1:]
+        eval_layers.extend(zip(rel_eval_layers,abs_eval_layers))
+    
+    random.shuffle(eval_layers)
     eval_layers = eval_layers[:num_layers]
-    total_num_layers = len(eval_layers)
-    gt_layers = []
     pred_layers = []
-    # pdb.set_trace()
-    for i in tqdm(range(len(eval_layers))):
-        sailfish_layer,marlin_layer = eval_layers[i]
-        # sailfish_layer = sailfish_layer[:5000]
-        # marlin_layer = marlin_layer[:5000]
-        if rel:
-            sailfish_layer,_ = sailfish_relative_extrusion(sailfish_layer)
-            sailfish_layer = sailfish_layer.replace("<e>","")
-        _,pred_layer = one_layer_comparison(args.model_path,sailfish_layer)
-        gt_layer = marlin_layer
-        gt_layers.append(gt_layer)
-        pdb.set_trace()
-        if rel:
-            pred_layer,_ = marlin_absolute_extrusion(pred_layer)
-        pred_layers.append(pred_layer)
-        # write gt_layer and pred_layer to files
-        gt_file = open(f"renders/gt_{i}.gcode",'w')
-        gt_file.write(gt_layer)
-        gt_file.close()
-        pred_file = open(f"renders/pred_{i}.gcode",'w')
-        pred_file.write(pred_layer)
-        pred_file.close()
-    iou_lst = iou_list(pred_layers, gt_layers,experiment_id)
+    gt_layers = []
+    for i in range(len(eval_layers)):
+        rel_layers,abs_layers = eval_layers[i]
+        rel_sailfish,rel_marlin = rel_layers
+        abs_sailfish,abs_marlin = abs_layers
+
+        #Translate each layer, get predicted relative marlin
+        _,pred_rel_marlin = one_layer_comparison(args.model_path,rel_sailfish)
+        pred_abs_marlin,_ = marlin_absolute_extrusion(pred_rel_marlin)
+
+        pred_layers.append(pred_abs_marlin)
+        gt_layers.append(abs_marlin)
+
+    iou_lst = iou_list(pred_layers, gt_layers,output_dir)
     iou_dist = (1-iou_lst)**2
     mean_iou_dist = np.mean(iou_dist)
     root_mean_iou_dist = np.sqrt(mean_iou_dist)
     print(f"Root Mean IOU Distance: {root_mean_iou_dist}")
-    iou_stats(iou_lst)
+    stats = iou_stats(iou_lst)
+    # write iou stats to text file in output directory
+    with open(os.path.join(output_dir,"iou_stats.txt"),'w') as f:
+        f.write(str(stats))
+
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", type=str, required=True, help="Path to the model")
+    parser.add_argument("--output_base_dir", type=str, required=True)
     args = parser.parse_args()
 
-    experiment_id = args.model_path.split('/')[-2]
+    experiment_id = args.model_path.strip('/').split('/')[-2]
+    output_dir = os.path.join(args.output_base_dir,experiment_id)
+
     args.experiment_id = experiment_id
-    num_layers = 1
+    num_layers = 30
     rel = True
-    do_eval(args.model_path,num_layers,rel,experiment_id)
-    validation_data = os.listdir("/vast/km3888/paired_gcode/thingiverse_10k_marlin/")[6000:]    
+    do_eval(args.model_path,num_layers,rel,output_dir)

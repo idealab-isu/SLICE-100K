@@ -1,7 +1,16 @@
 import pdb
 import re
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import numpy as np
+
+
+def distance_and_angle(x1, y1, x2, y2):
+    dx = x2 - x1
+    dy = y2 - y1
+    distance = np.sqrt(dx ** 2 + dy ** 2)
+    angle = np.degrees(np.arctan2(dy, dx))
+    return distance, angle
 
 def parse_gcode(gcode):
     layer_dict = {}
@@ -76,9 +85,45 @@ def plot_layer(layer_dict,render_path, layer_num=None):
     plt.savefig(render_path)
     
     img = plt.imread(render_path)
+    #close the plot
+    plt.close()
     #load image back as binary array and convert to numpy array
     img = np.array(img)
     return img [:,:,0]
+
+def plot_layer_rectangle(layer_dict, render_path, layer_num=None, width=0.3):
+    x_vals = []
+    y_vals = []
+    for z, points in layer_dict.items():
+        for (x1, y1, x2, y2) in points:
+            x_vals.extend([x1, x2])
+            y_vals.extend([y1, y2])
+
+    bbox = (min(x_vals), max(x_vals), min(y_vals), max(y_vals))
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+    if layer_num is None:
+        layers = layer_dict.keys()
+    else:
+        layers = [list(sorted(layer_dict.keys()))[int(layer_num)]]
+        
+    for z in layers:
+        points = layer_dict.get(z, [])
+        for (x1, y1, x2, y2) in points:
+            length, angle = distance_and_angle(x1, y1, x2, y2)
+            rect = patches.Rectangle((x1, y1 - 0.175), length, width, angle=angle,
+                                     edgecolor='none', facecolor='blue', alpha=0.5)
+            ax.add_patch(rect)
+
+    plt.title(f'G-code Layer Visualization - Layer {layer_num}' if layer_num else 'All Layers')
+    ax.set_xlim(0.9*bbox[0], 1.1*bbox[1])
+    ax.set_ylim(0.9*bbox[2], 1.1*bbox[3])
+    plt.savefig(render_path)
+    plt.close()
+    img = plt.imread(render_path)
+    img = np.array(img)
+    return img [:,:,0]
+
 
 if __name__ == "__main__":
     # Assuming 'gcode_path' is the path to your G-code file
@@ -91,7 +136,7 @@ if __name__ == "__main__":
     lyr_input = input("Enter the layer number to visualize: ")
 
     while lyr_input != "exit":
-        plot_layer(gcode_layers, float(lyr_input))
+        plot_layer_rectangle(gcode_layers, "/home/km3888/gcode_processing/2_test.png", float(lyr_input))
         lyr_input = input("Enter the layer number to visualize: ")
 
     # plot_layer(gcode_layers, 2.45)
