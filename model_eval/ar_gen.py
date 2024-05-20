@@ -1,7 +1,7 @@
 import json 
 from transformers import pipeline,AutoTokenizer
 import pdb 
-from transformers import GPT2Tokenizer, GPT2LMHeadModel, GenerationConfig
+from transformers import GPT2Tokenizer, GPT2LMHeadModel, GenerationConfig, AutoModelForCausalLM
 import prettytable
 import argparse
 import os
@@ -35,12 +35,15 @@ def get_model(model_name):
     # Load your model and tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_name,use_fast=True)
     tokenizer.pad_token = tokenizer.eos_token 
-    model = GPT2LMHeadModel.from_pretrained(model_name)
+    if "llama" in model_name:
+        model = AutoModelForCausalLM.from_pretrained(model_name,local_files_only=True,return_dict=True).to("cuda:0")
+    else:
+        model = GPT2LMHeadModel.from_pretrained(model_name).to("cuda:0")
     return model,tokenizer
 
 def generate_text(model,tokenizer,starting_text):
     # Your input text (the first half of a text)
-    model.to('cuda:0')
+    assert model.device!="cpu"
     text_ids = tokenizer.encode(starting_text,return_tensors='pt').to(model.device)
     gen_config = GenerationConfig()
     gen_config.pad_token_id = 2
@@ -118,8 +121,11 @@ def get_layer(layer_idx=0):
     marlin_layer = marlin_file.split(';LAYER_CHANGE')[layer_idx]
     return layer
 
-def one_layer_comparison(model_path,layer):
-    model,tokenizer = get_model(model_path)
+def one_layer_comparison(model_path,layer,model=None,tokenizer=None):
+    if model is None or tokenizer is None:
+        print('loading model...')
+        model,tokenizer = get_model(model_path)
+    # model,tokenizer = get_model(model_path)
     layer_split = layer.split('\n')
     layer_split = [x + "\n" for x in layer_split[:-2]]+[layer_split[-1]]
     layer_split = fixed_length_chunking(layer,20)

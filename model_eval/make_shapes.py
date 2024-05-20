@@ -1,4 +1,4 @@
-from ar_gen import one_layer_comparison
+from ar_gen import one_layer_comparison, get_model
 from gcode_render import parse_gcode, plot_layer
 import argparse
 import pdb
@@ -89,6 +89,10 @@ def iou_stats(iou_lst):
     return stats
 
 def do_translation(model_path,num_shapes,output_dir):
+    # load model and tokenizer
+    model,tokenizer = get_model(model_path)
+    print("Model loaded")
+
     os.makedirs(output_dir,exist_ok=True)
     eval_shapes = get_eval_shapes(num_shapes)
     output_dir = os.path.join(output_dir)
@@ -104,7 +108,7 @@ def do_translation(model_path,num_shapes,output_dir):
         pred_marlin_layers = [relative_layers[0][1]]
         for layer_idx in tqdm(range(1,len(relative_layers))):
             sailfish_layer = relative_layers[layer_idx][0]
-            _,pred_layer = one_layer_comparison(args.model_path,sailfish_layer)
+            _,pred_layer = one_layer_comparison(args.model_path,sailfish_layer,model,tokenizer)
             pred_marlin_layers.append(pred_layer)
 
         # Join layers together and convert back to absolute extrusion
@@ -113,6 +117,8 @@ def do_translation(model_path,num_shapes,output_dir):
         
         # Write pred_marlin to file
         output_path = os.path.join(output_dir,f"shape_{shape_idx}.gcode")
+        with open(output_path,'w') as f:
+            f.write(pred_marlin)
 
         # IOU is layer-wise so have to convert back to split layers
         iou_lst = iou_list(pred_marlin.split(";LAYER_CHANGE")[1:],marlin_shape.split(";LAYER_CHANGE")[1:],output_dir)

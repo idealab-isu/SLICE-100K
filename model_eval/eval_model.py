@@ -1,4 +1,4 @@
-from ar_gen import one_layer_comparison
+from ar_gen import one_layer_comparison, get_model
 from gcode_render import parse_gcode, plot_layer, plot_layer_rectangle
 import argparse
 import pdb
@@ -69,6 +69,10 @@ def iou_stats(iou_lst):
     return stats
 
 def do_eval(model_path,num_layers,rel,output_dir):
+    #load model and tokenizer
+    model,tokenizer = get_model(model_path)
+    print("Model loaded")
+
     eval_shapes = get_eval_shapes()
     eval_layers = []
     # Get relative layers to sample from
@@ -79,22 +83,23 @@ def do_eval(model_path,num_layers,rel,output_dir):
         rel_eval_layers = get_layers([(relative_sailfish,relative_marlin)])[1:]
         eval_layers.extend(zip(rel_eval_layers,abs_eval_layers))
     
+    print("Started translation")
     random.shuffle(eval_layers)
     eval_layers = eval_layers[:num_layers]
     pred_layers = []
     gt_layers = []
-    for i in range(len(eval_layers)):
+    for i in tqdm(range(len(eval_layers))):
         rel_layers,abs_layers = eval_layers[i]
         rel_sailfish,rel_marlin = rel_layers
         abs_sailfish,abs_marlin = abs_layers
 
         #Translate each layer, get predicted relative marlin
-        _,pred_rel_marlin = one_layer_comparison(args.model_path,rel_sailfish)
+        _,pred_rel_marlin = one_layer_comparison(args.model_path,rel_sailfish,model,tokenizer)
         pred_abs_marlin,_ = marlin_absolute_extrusion(pred_rel_marlin)
 
         pred_layers.append(pred_abs_marlin)
         gt_layers.append(abs_marlin)
-
+    print("Finished translation")
     iou_lst = iou_list(pred_layers, gt_layers,output_dir)
     iou_dist = (1-iou_lst)**2
     mean_iou_dist = np.mean(iou_dist)
@@ -110,12 +115,19 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path", type=str, required=True, help="Path to the model")
     parser.add_argument("--output_base_dir", type=str, required=True)
+    parser.add_argument("--num_layers", type=int, default=10)
     args = parser.parse_args()
 
+    # set up output directory
     experiment_id = args.model_path.strip('/').split('/')[-2]
+    if "openai" in args.model_path:
+        experiment_id = 'base_gpt2'
+    if "meta" in args.model_path or "llama" in args.model_path:
+        experiment_id = 'base_llama2'
     output_dir = os.path.join(args.output_base_dir,experiment_id)
-
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
     args.experiment_id = experiment_id
-    num_layers = 30
+
     rel = True
-    do_eval(args.model_path,num_layers,rel,output_dir)
+    do_eval(args.model_path,args.num_layers,rel,output_dir)
