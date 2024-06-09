@@ -9,8 +9,7 @@ from tqdm import tqdm
 import random
 import copy
 import re
-from gcode_preprocessing import absolute_extrusion, relative_extrusion, get_layers, marlin_absolute_extrusion
-random.seed(42)
+from gcode_preprocessing import absolute_extrusion, relative_extrusion, get_layers, marlin_absolute_extrusion,aligned_chunks,flip_on_contours
 
 def get_eval_shapes(num_files=10):
     sailfish_data_dir = "/vast/km3888/paired_gcode/thingiverse_10k_sailfish"  
@@ -38,7 +37,9 @@ def iou_list(pred_lst, gt_lst,output_dir):
         if not len(pred_layer_dict):
             continue
         assert all([x is not None for x in pred_layer_dict.keys()])
-        assert len(pred_layer_dict) == len(gt_layer_dict), "Number of layers do not match"
+        if not len(pred_layer_dict) == len(gt_layer_dict):#"Number of layers do not match":
+            iou_lst.append(0)
+            continue
         gt_path = os.path.join(output_dir,str(i)+"_gt_rec.png")
         pred_path = os.path.join(output_dir,str(i)+"_pred_rec.png")
         pred_layer = plot_layer_rectangle(pred_layer_dict,pred_path)
@@ -68,23 +69,29 @@ def iou_stats(iou_lst):
     }
     return stats
 
-def do_eval(model_path,num_layers,rel,output_dir):
+def do_eval(model_path,num_layers,rel,output_dir,peft,dataset_seed,model_inference_seed):
     #load model and tokenizer
-    model,tokenizer = get_model(model_path)
+    model,tokenizer = get_model(model_path,is_peft=peft)
     print("Model loaded")
 
     eval_shapes = get_eval_shapes()
     eval_layers = []
+    original_layers = []
     # Get relative layers to sample from
     for shape_idx in range(len(eval_shapes)):
         sailfish_shape,marlin_shape = eval_shapes[shape_idx]
+
         abs_eval_layers = get_layers([(sailfish_shape,marlin_shape)])[1:]
         relative_marlin,relative_sailfish = relative_extrusion(marlin_shape,sailfish_shape)
         rel_eval_layers = get_layers([(relative_sailfish,relative_marlin)])[1:]
         eval_layers.extend(zip(rel_eval_layers,abs_eval_layers))
     
     print("Started translation")
+
+    random.seed(dataset_seed)
     random.shuffle(eval_layers)
+    random.seed(model_inference_seed
+    )
     eval_layers = eval_layers[:num_layers]
     pred_layers = []
     gt_layers = []
@@ -92,11 +99,33 @@ def do_eval(model_path,num_layers,rel,output_dir):
         rel_layers,abs_layers = eval_layers[i]
         rel_sailfish,rel_marlin = rel_layers
         abs_sailfish,abs_marlin = abs_layers
+        
+        #This code is for quickly looking through samples
+        # ====================================================================================================
+        # flipped_sailfish,flipped_marlin,_,_ = flip_on_contours(abs_sailfish,abs_marlin)
+        # flipped_rel_sailfish,flipped_rel_marlin,_,_ = flip_on_contours(rel_sailfish,rel_marlin)
 
-        #Translate each layer, get predicted relative marlin
+        # chunks = aligned_chunks(flipped_sailfish,flipped_marlin,20)
+        # rel_chunks = aligned_chunks(flipped_rel_sailfish,flipped_rel_marlin,20)
+
+        # indices = list(range(len(chunks)))
+        # random.shuffle(indices)
+        # indices = indices[:5]
+        # for i in indices:
+        #     sailfish_chunk = chunks[i]["text_1"]
+        #     marlin_chunk = chunks[i]["text_2"]
+
+        #     rel_sailfish_chunk = rel_chunks[i]["text_1"]
+        #     rel_marlin_chunk = rel_chunks[i]["text_2"]
+
+        #     pred_marlin_chunk,_ = one_layer_comparison(args.model_path,rel_sailfish_chunk,model,tokenizer)
+        #     pred_marlin_chunks = marlin_absolute_extrusion(pred_marlin_chunk)
+        # ====================================================================================================
+
+        # #Translate each layer, get predicted relative marlin
         _,pred_rel_marlin = one_layer_comparison(args.model_path,rel_sailfish,model,tokenizer)
         pred_abs_marlin,_ = marlin_absolute_extrusion(pred_rel_marlin)
-
+        
         pred_layers.append(pred_abs_marlin)
         gt_layers.append(abs_marlin)
     print("Finished translation")
@@ -116,18 +145,29 @@ if __name__=="__main__":
     parser.add_argument("--model_path", type=str, required=True, help="Path to the model")
     parser.add_argument("--output_base_dir", type=str, required=True)
     parser.add_argument("--num_layers", type=int, default=10)
+    parser.add_argument("--dataset_seed", type=int, default=42)
+    parser.add_argument("--model_inference_seed", type=int, default=42)
     args = parser.parse_args()
 
     # set up output directory
+    peft=False
     experiment_id = args.model_path.strip('/').split('/')[-2]
+    
     if "openai" in args.model_path:
         experiment_id = 'base_gpt2'
-    if "meta" in args.model_path or "llama" in args.model_path:
+    elif "meta" in args.model_path or "llama" in args.model_path:
         experiment_id = 'base_llama2'
+    else:
+        # list all the files in the model_path
+        files = os.listdir(args.model_path)
+        # if there's a README in the directory, it's a PEFT
+        peft = any([re.match(r'README',file) for file in files])
+
+    experiment_id += f"{args.dataset_seed}_{args.model_inference_seed}"
     output_dir = os.path.join(args.output_base_dir,experiment_id)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     args.experiment_id = experiment_id
 
     rel = True
-    do_eval(args.model_path,args.num_layers,rel,output_dir)
+    do_eval(args.model_path,args.num_layers,rel,output_dir,peft,args.dataset_seed,args.model_inference_seed)
