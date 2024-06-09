@@ -1,5 +1,5 @@
 from ar_gen import one_layer_comparison, get_model
-from gcode_render import parse_gcode, plot_layer
+from gcode_render import parse_gcode, plot_layer,plot_layer_rectangle
 import argparse
 import pdb
 import numpy as np
@@ -56,18 +56,18 @@ def iou_list(pred_lst, gt_lst,output_dir):
     for i,(pred,gt) in enumerate(zip(pred_lst, gt_lst)):
         pred_layer_dict = parse_gcode(pred)
         gt_layer_dict = parse_gcode(gt)
-        assert [x for x in pred_layer_dict.keys()][0] is not None
+        if not len(pred_layer_dict):
+            continue
+        assert all([x is not None for x in pred_layer_dict.keys()])
         assert len(pred_layer_dict) == len(gt_layer_dict), "Number of layers do not match"
         gt_path = os.path.join(output_dir,str(i)+"_gt.png")
         pred_path = os.path.join(output_dir,str(i)+"_pred.png")
 
-        pred_layer = plot_layer(pred_layer_dict,pred_path,0)
-        gt_layer = plot_layer(gt_layer_dict,gt_path,0)
+        pred_layer = plot_layer_rectangle(pred_layer_dict,pred_path,0)
+        gt_layer = plot_layer_rectangle(gt_layer_dict,gt_path,0)
 
-        # intersection = np.logical_and(pred, gt)
         intersection = pred_layer * gt_layer
         union = np.stack([pred_layer,gt_layer]).max(axis=0)
-        # union = np.logical_or(pred, gt)
     
         iou = np.sum(intersection) / np.sum(union)
         iou_lst.append(iou)
@@ -109,8 +109,17 @@ def do_translation(model_path,num_shapes,output_dir):
         for layer_idx in tqdm(range(1,len(relative_layers))):
             sailfish_layer = relative_layers[layer_idx][0]
             _,pred_layer = one_layer_comparison(args.model_path,sailfish_layer,model,tokenizer)
+            # pdb.set_trace()
             pred_marlin_layers.append(pred_layer)
-
+            if layer_idx == 1:
+                # save raw text of pred_layer 
+                layer_path = os.path.join(output_dir,f"layer_{shape_idx}.txt")
+                with open(layer_path,'w') as f:
+                    f.write(pred_layer)
+                gt_layer_path = os.path.join(output_dir,f"gt_layer_{shape_idx}.txt")
+                with open(gt_layer_path,'w') as f:
+                    f.write(marlin_shape)
+                
         # Join layers together and convert back to absolute extrusion
         relative_marlin_pred = "".join(pred_marlin_layers)
         pred_marlin, _ = absolute_extrusion(relative_marlin_pred,sailfish_shape)
@@ -120,6 +129,26 @@ def do_translation(model_path,num_shapes,output_dir):
         with open(output_path,'w') as f:
             f.write(pred_marlin)
 
+        #also save relative_marlin_pred
+        relative_output_path = os.path.join(output_dir,f"relative_shape_{shape_idx}.gcode")
+        with open(relative_output_path,'w') as f:
+            f.write(relative_marlin_pred)
+
+        # also save sailfish_shape
+        sailfish_output_path = os.path.join(output_dir,f"sailfish_shape_{shape_idx}.gcode")
+        with open(sailfish_output_path,'w') as f:
+            f.write(sailfish_shape)
+        
+        # also save ground truth marlin shape
+        marlin_output_path = os.path.join(output_dir,f"marlin_shape_{shape_idx}.gcode")
+        with open(marlin_output_path,'w') as f:
+            f.write(marlin_shape)
+
+        # also save relative sailfish
+        relative_sailfish_output_path = os.path.join(output_dir,f"relative_sailfish_{shape_idx}.gcode")
+        with open(relative_sailfish_output_path,'w') as f:
+            f.write(relative_sailfish)
+            
         # IOU is layer-wise so have to convert back to split layers
         iou_lst = iou_list(pred_marlin.split(";LAYER_CHANGE")[1:],marlin_shape.split(";LAYER_CHANGE")[1:],output_dir)
         stats = iou_stats(iou_lst)
