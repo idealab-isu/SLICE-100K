@@ -7,6 +7,7 @@ import argparse
 import os
 from transformers import LogitsProcessor, StoppingCriteria, StoppingCriteriaList
 import torch
+from peft import PeftModel, PeftConfig
 
 class EOSStoppingCriteria(LogitsProcessor):
     def __init__(self, eos_token_id):
@@ -24,21 +25,29 @@ class EOSStoppingCriteria(LogitsProcessor):
         return 1
 
 def fixed_length_chunking(text,chunk_size):
-    text_lines = text.split('\n')
+    layer_split = text.split('\n')
+    layer_split = [x for x in layer_split if len(x)]
     chunked_text = []
-    for i in range(0,len(text_lines),chunk_size):
-        chunk = text_lines[i:i+chunk_size]
-        chunked_text.append("\n".join(chunk))
+    for i in range(0,len(layer_split),chunk_size):
+        chunk = layer_split[i:i+chunk_size]
+        # chunk = [x for x in chunk if len(x)]
+        chunked_text.append("\n".join(chunk)+"\n")
     return chunked_text
 
-def get_model(model_name):
+def get_model(model_name,is_peft=False):
     # Load your model and tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_name,use_fast=True)
     tokenizer.pad_token = tokenizer.eos_token 
-    if "llama" in model_name:
-        model = AutoModelForCausalLM.from_pretrained(model_name,local_files_only=True,return_dict=True).to("cuda:0")
+
+    if is_peft:
+        peft_config = PeftConfig.from_pretrained(model_name)
+        base_model = AutoModelForCausalLM.from_pretrained(peft_config.base_model_name_or_path)
+        model = PeftModel(base_model,peft_config)
     else:
-        model = GPT2LMHeadModel.from_pretrained(model_name).to("cuda:0")
+        if "llama" in model_name:
+            model = AutoModelForCausalLM.from_pretrained(model_name,local_files_only=True,return_dict=True).to("cuda:0")
+        else:
+            model = GPT2LMHeadModel.from_pretrained(model_name).to("cuda:0")
     return model,tokenizer
 
 def generate_text(model,tokenizer,starting_text):
@@ -53,7 +62,7 @@ def generate_text(model,tokenizer,starting_text):
     stopping_criteria = StoppingCriteriaList([stopping_criteria_eos])
     output = model.generate(text_ids, generation_config=gen_config, num_return_sequences=1, \
         temperature=0.7,output_scores=True,stopping_criteria=stopping_criteria, length_penalty=-1.0, \
-        return_dict_in_generate=True,max_length=1023,do_sample=True,num_beams=5,top_k=5)
+        return_dict_in_generate=True,max_length=700,do_sample=True,num_beams=5,top_k=5)
     # print('gen length:',output[0].shape[1])
     # # Decode the generated text
     # predicted_logits = model(output[0]).logits
@@ -126,8 +135,6 @@ def one_layer_comparison(model_path,layer,model=None,tokenizer=None):
         print('loading model...')
         model,tokenizer = get_model(model_path)
     # model,tokenizer = get_model(model_path)
-    layer_split = layer.split('\n')
-    layer_split = [x + "\n" for x in layer_split[:-2]]+[layer_split[-1]]
     layer_split = fixed_length_chunking(layer,20)
     output_layer = []
     for chunk in layer_split:
