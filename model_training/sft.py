@@ -156,9 +156,9 @@ if __name__ == "__main__":
     #initialize wandb
     wandb_name = "interactive"
     if other_args.job_id is not None:
-        wandb_name = job_id
+        wandb_name = other_args.job_id
     if other_args.task_id is not None:
-        wandb_name = wandb_name + "_" + task_id
+        wandb_name = wandb_name + "_" + other_args.task_id
 
     wandb_config = {}
     wandb_config["dataset"] = dataset
@@ -200,6 +200,13 @@ if __name__ == "__main__":
     print('len train dataset:',len(train_dataset))
     print('len eval dataset:',len(eval_dataset))
     training_args.save_steps = 100
+    # training_args.fp16 = True
+    print('model config:')
+    print(model_config)
+    print('training args')
+    print(training_args)
+    print('peft config:')
+    print(get_peft_config(model_config))
     trainer = SFTTrainer(
         model=model_config.model_name_or_path,
         model_init_kwargs=model_kwargs,
@@ -219,5 +226,6 @@ if __name__ == "__main__":
     print('initial evaluation at time:',format_time(time.time()-start_time))
     trainer.evaluate()
     print('starting training at time:',format_time(time.time()-start_time))
+    # pdb.set_trace()
     trainer.train()
     trainer.save_model(training_args.output_dir)
