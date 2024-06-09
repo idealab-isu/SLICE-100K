@@ -124,19 +124,3 @@ def plot_layer_rectangle(layer_dict, render_path, layer_num=None, width=0.3):
     img = np.array(img)
     return img [:,:,0]
 
-
-if __name__ == "__main__":
-    # Assuming 'gcode_path' is the path to your G-code file
-    gcode_path = "/vast/km3888/paired_gcode/thingiverse_10k_marlin/thing-10057-file-32149_objaverse_xl_config_marlin.gcode"
-    #load gcode from gcode_path
-    gcode = open(gcode_path, 'r').read()
-    gcode_layers = parse_gcode(gcode)
-
-    # Visualize the layers
-    lyr_input = input("Enter the layer number to visualize: ")
-
-    while lyr_input != "exit":
-        plot_layer_rectangle(gcode_layers, "/home/km3888/gcode_processing/2_test.png", float(lyr_input))
-        lyr_input = input("Enter the layer number to visualize: ")
-
-    # plot_layer(gcode_layers, 2.45)

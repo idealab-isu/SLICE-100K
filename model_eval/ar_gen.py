@@ -115,21 +115,6 @@ def one_line_comparison(args):
         f.write('\n')
     print_tokens(start_gcode,generated_gcode)
 
-def get_layer(layer_idx=0):
-    sailfish_data_dir = "/vast/km3888/paired_gcode/thingiverse_10k_sailfish"  
-    marlin_data_dir = "/vast/km3888/paired_gcode/thingiverse_10k_marlin"
-    data_path = os.listdir(sailfish_data_dir)[-1]
-    sailfish_data_path = os.path.join(data_dir,data_path)
-    marlin_data_path = os.path.join(marlin_data_dir,data_path)
-
-
-    sailfish_file = open(sailfish_data_path,'r').read()
-    marlin_file = open(marlin_data_path,'r').read()
-
-    sailfish_layer = sailfish_file.split(';LAYER_CHANGE')[layer_idx]
-    marlin_layer = marlin_file.split(';LAYER_CHANGE')[layer_idx]
-    return layer
-
 def one_layer_comparison(model_path,layer,model=None,tokenizer=None):
     if model is None or tokenizer is None:
         print('loading model...')
@@ -149,44 +134,3 @@ def one_layer_comparison(model_path,layer,model=None,tokenizer=None):
     #     f.write('\n')
     return layer, output_layer
     
-def test_on_train_input(args):
-    model,tokenizer = get_model(args.model_path)
-    data_file = "translation_data_100_instruct_20.json"
-    data_path = "/vast/km3888/paired_gcode/%s" % data_file
-
-    with open(data_path,'r') as f:
-        data = json.load(f)
-    for i in range(25):
-        train_datapoint = data[i]
-        full_text = train_datapoint['text']
-        text_ids = tokenizer.encode(full_text+"<endoftext>",return_tensors='pt') # adding a pad token so we can predict next token
-        model_preds = model(text_ids).logits
-        eos_probs = torch.softmax(model_preds,dim=-1)[:,:,-1]
-        # print(eos_probs.squeeze()[-1])
-        print(eos_probs.max())
-
-
-if __name__=="__main__":
-
-    parser = argparse.ArgumentParser()
-    # parser.add_argument('--model_path',default="/scratch/km3888/gcode_peft/checkpoint-8000",type=str)
-    # parser.add_argument('--model_path',default="/scratch/km3888/gcode_peft/45428360_1/checkpoint-4500",type=str)
-    # parser.add_argument('--model_path',default="openai-community/gpt2",type=str)
-    # parser.add_argument('--model_path',default="/scratch/km3888/gcode_peft/45497828_0/checkpoint_500",type=str)
-    parser.add_argument('--model_path',default="/scratch/km3888/gcode_peft/46465152_0/checkpoint-100/",type=str)
-
-    args = parser.parse_args()
-
-    experiment_id = args.model_path.split('/')[-2]
-    args.experiment_id = experiment_id
-    args.out_file = f'output_{experiment_id}.txt'
-    # one_line_comparison(args)
-    # one_layer_comparison(args,args.model_path)
-    layers = []
-    layer_1 = get_layer(1)
-    layers.append(layer_1)
-    layer_2 = get_layer(2)
-    layers.append(layer_2)
-
-    multi_layer_translation(args.model_path,layers)
-    # test_on_train_input(args)

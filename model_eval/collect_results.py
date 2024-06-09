@@ -4,7 +4,7 @@ import prettytable
 
 iou_paths = ["base_gpt2/iou_stats.txt","47185774_0/iou_stats.txt","47163343_0/iou_stats.txt","47015772_0/iou_stats.txt","47015772_1/iou_stats.txt","47015772_2/iou_stats.txt","47015772_3/iou_stats.txt"]
 threshes = [0.9,0.95,0.98,0.99,0.995,0.999]
-base_dir = "/vast/km3888/translation_evals"
+base_dir = None #add base_dir if using result collection script
 
 thresh_lst = []
 for iou_path in iou_paths:

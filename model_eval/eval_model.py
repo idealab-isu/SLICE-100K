@@ -11,9 +11,9 @@ import copy
 import re
 from gcode_preprocessing import absolute_extrusion, relative_extrusion, get_layers, marlin_absolute_extrusion,aligned_chunks,flip_on_contours
 
-def get_eval_shapes(num_files=10):
-    sailfish_data_dir = "/vast/km3888/paired_gcode/thingiverse_10k_sailfish"  
-    marlin_data_dir = "/vast/km3888/paired_gcode/thingiverse_10k_marlin"
+def get_eval_shapes(base_data_dir,num_files=10):
+    sailfish_data_dir = os.path.join(base_data_dir,"thingiverse_10k_sailfish")
+    marlin_data_dir = os.path.join(base_data_dir,"thingiverse_10k_marlin")
 
     data_files = os.listdir(sailfish_data_dir)
     eval_data_files = data_files[6000:6000+num_files]
@@ -69,12 +69,12 @@ def iou_stats(iou_lst):
     }
     return stats
 
-def do_eval(model_path,num_layers,rel,output_dir,peft,dataset_seed,model_inference_seed):
+def do_eval(model_path,num_layers,rel,output_dir,peft,dataset_seed,model_inference_seed,base_data_dir):
     #load model and tokenizer
     model,tokenizer = get_model(model_path,is_peft=peft)
     print("Model loaded")
 
-    eval_shapes = get_eval_shapes()
+    eval_shapes = get_eval_shapes(base_data_dir)
     eval_layers = []
     original_layers = []
     # Get relative layers to sample from
@@ -147,6 +147,7 @@ if __name__=="__main__":
     parser.add_argument("--num_layers", type=int, default=10)
     parser.add_argument("--dataset_seed", type=int, default=42)
     parser.add_argument("--model_inference_seed", type=int, default=42)
+    parser.add_argument("--base_data_dir", type=str, required=True)
     args = parser.parse_args()
 
     # set up output directory
@@ -170,4 +171,5 @@ if __name__=="__main__":
     args.experiment_id = experiment_id
 
     rel = True
-    do_eval(args.model_path,args.num_layers,rel,output_dir,peft,args.dataset_seed,args.model_inference_seed)
+    do_eval(args.model_path,args.num_layers,rel,output_dir,peft,\
+            args.dataset_seed,args.model_inference_seed,args.base_data_dir)

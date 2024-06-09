@@ -504,38 +504,9 @@ def test_extrusion2(args):
                     pdb.set_trace()
     pdb.set_trace()
 
-def test_output():
-    path = "/vast/km3888/translation_shapes2/46806240_0/layer_0.txt"
-    #load test shape
-    with open(path) as f:
-        relative_shape = f.read()
-
-    #convert first layer to absolute extrusion
-    first_layer = relative_shape.split(';LAYER_CHANGE')[1]
-    absolute_first_layer, _ = sailfish_absolute_extrusion(first_layer)
-
-    filtered_lines = []
-    for line in absolute_first_layer.split('\n'):
-        spaced = line.split(' ')
-        keep=True
-        for i in range(len(spaced)):
-            # if space[i] has multiple decimals, don't add this line to filtered_lines
-            if len(spaced[i].split('.')) > 2:
-                keep = False
-        if keep:
-            filtered_lines.append(line)
-    filtered_absolute_first_layer = '\n'.join(filtered_lines)
-
-    output_path = "/vast/km3888/translation_shapes2/46806240_0/reattempt_0.gcode"
-    with open(output_path, 'w') as f:
-        f.write(filtered_absolute_first_layer)
-
-    pdb.set_trace()
-
-
 if __name__=="__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Test extrusion functions')
-    parser.add_argument('--data_path', type=str,default="/vast/km3888/paired_gcode", help='Path to the data folder')
+    parser.add_argument('--data_path', type=str,required=True, help='Path to the data folder')
     args = parser.parse_args()
     test_output()

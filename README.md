@@ -55,5 +55,6 @@ Finally, model eval can be done with the following command which will save all t
 export PYTHONPATH=$(pwd):$PYTHONPATH
 python model_eval/eval_model.py \
     --model_path [TRAINED_MODEL] \
+    --base_data_dir [ORIGINAL_DATA_DIRECTORY]
     --output_base_dir [EVAL_LOGGING_DIRECTORY]
 ```
