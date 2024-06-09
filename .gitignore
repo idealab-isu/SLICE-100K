@@ -66,3 +66,5 @@ model_eval/eval_model.sh
 model_eval/make_shapes.sh
 wandb/*
 debug_outputs/layer_a_delimited.gcode
+*.sh
+*.gcode
