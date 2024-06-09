@@ -5,7 +5,7 @@ import os
 import sys
 import argparse
 
-from gcode_preprocessing.preprocess_utils import debug, get_layers, \
+from preprocess_utils import debug, get_layers, \
                              get_data,convert_strings_to_table
                              
 from extrusion import  relative_extrusion, test_extrusion
