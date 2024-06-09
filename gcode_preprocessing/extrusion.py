@@ -224,8 +224,8 @@ def sailfish_absolute_extrusion(layer,init_val=None):
         absolute_inks.append(absolute_ink)
     absolute_layer = ''.join(absolute_inks)
     absolute_layer = absolute_layer.replace('E0.', 'E.')
-    if '<e>' in absolute_layer:
-        pdb.set_trace()
+    # if '<e>' in absolute_layer:
+    #     pdb.set_trace()
     next_init_val = float(with_initial[-1][0].group(1))
     if len(with_initial[-1][1])>0:
         next_init_val = absolutes[i]
@@ -350,8 +350,13 @@ def marlin_absolute_extrusion(layer):
     """
     # Recover original layer from relative extrusion
     relative_inks = layer.split('G92 E0')
+    first_ink = relative_inks[0]
+    if "G1 E2.0 F2400" in first_ink:
+        split_first_ink = first_ink.split("G1 E2.0 F2400")
+        relative_inks = split_first_ink + relative_inks[1:]
     absolute_inks = [relative_inks[0]]
     for ink in relative_inks[1:]:
+        # pdb.set_trace()
         if "<e>" not in layer:
             ink = demarcate_extrusion_vals(ink)
         # get all the string portions surrounded by <e> tags
@@ -499,9 +504,38 @@ def test_extrusion2(args):
                     pdb.set_trace()
     pdb.set_trace()
 
+def test_output():
+    path = "/vast/km3888/translation_shapes2/46806240_0/layer_0.txt"
+    #load test shape
+    with open(path) as f:
+        relative_shape = f.read()
+
+    #convert first layer to absolute extrusion
+    first_layer = relative_shape.split(';LAYER_CHANGE')[1]
+    absolute_first_layer, _ = sailfish_absolute_extrusion(first_layer)
+
+    filtered_lines = []
+    for line in absolute_first_layer.split('\n'):
+        spaced = line.split(' ')
+        keep=True
+        for i in range(len(spaced)):
+            # if space[i] has multiple decimals, don't add this line to filtered_lines
+            if len(spaced[i].split('.')) > 2:
+                keep = False
+        if keep:
+            filtered_lines.append(line)
+    filtered_absolute_first_layer = '\n'.join(filtered_lines)
+
+    output_path = "/vast/km3888/translation_shapes2/46806240_0/reattempt_0.gcode"
+    with open(output_path, 'w') as f:
+        f.write(filtered_absolute_first_layer)
+
+    pdb.set_trace()
+
+
 if __name__=="__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Test extrusion functions')
     parser.add_argument('--data_path', type=str,default="/vast/km3888/paired_gcode", help='Path to the data folder')
     args = parser.parse_args()
-    test_extrusion2(args)
+    test_output()
