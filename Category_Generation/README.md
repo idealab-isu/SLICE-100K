@@ -15,13 +15,6 @@ Activate the environment
 
 The code uses the renderings stored in the zipped folders contained in the parent folder. Folder Structure of the data
 
-Parent Folder
-│
-├── Zipped_STL_Folder_1.zip
-│
-├── Zipped_STL_Folder_2.zip
-│
-└── ...
 
 ```
 parent_folder/
