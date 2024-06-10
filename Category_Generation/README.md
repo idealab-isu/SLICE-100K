@@ -23,16 +23,18 @@ Parent Folder
 │
 └── ...
 
+```
 parent_folder/
 │
 ├── Zipped_STL_Folder_1.zip
 ├── Zipped_STL_Folder_2.zip
 └── ...
-
+```
 
 It unzips each folder, generate the category using the renderings stored in the folder and saves the categories in json file and zips the folder back
 
-## Run the following command
+## Run the following command to generate the categories
+
 ```python Category_Generation.py /path/to/parent_folder```
 
 
