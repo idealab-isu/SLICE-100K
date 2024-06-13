@@ -1,0 +1,26 @@
+#!/bin/bash
+
+#SBATCH --time=20:00:00   # walltime limit (HH:MM:SS)
+#SBATCH --nodes=1   # number of nodes
+#SBATCH --ntasks-per-node=6   # 6 processor core(s) per node 
+#SBATCH --job-name="Enter job name here"
+#SBATCH --mail-user=   # email address
+#SBATCH --mail-type=BEGIN
+#SBATCH --mail-type=END
+#SBATCH --mail-type=FAIL
+#SBATCH --output=""
+#SBATCH --error="""
+
+#echo commands to stdout
+set -x
+
+module load miniconda3
+source activate path to blender env
+
+# debugging flags (optional)
+# export NCCL_DEBUG=INFO
+# export PYTHONFAULTHANDLER=1
+
+which python
+
+python custom_main.py

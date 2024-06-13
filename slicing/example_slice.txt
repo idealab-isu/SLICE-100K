@@ -1,0 +1,48 @@
+#!/bin/bash
+
+#SBATCH --time=24:00:00   # walltime limit (HH:MM:SS)
+#SBATCH --nodes=1 # number of nodes
+#SBATCH --ntasks-per-node=36   # 36 processor core(s) per node 
+#SBATCH --mem=250G   # maximum memory per node
+#SBATCH --job-name=""
+#SBATCH --mail-user=  # email address
+#SBATCH --mail-type=BEGIN
+#SBATCH --mail-type=END
+#SBATCH --mail-type=FAIL
+#SBATCH --output=""
+#SBATCH --error=""
+#SBATCH --array=0-35
+
+
+module load parallel
+module load miniconda3
+source activate "name of env"
+which python
+
+
+IN_DIR="path to directory containing stl files"
+OUT_DIR_1="path to directory where gcode files will be saved"
+OUT_DIR_2="ignore this"
+PRUSA_PATH="path to prusa slicer executable"
+CONFIG_DIR="path to directory containing config files"
+CONFIG_NAMES="objaverse_xl_config_1.ini,objaverse_xl_config_2.ini,objaverse_xl_config_3.ini,objaverse_xl_config_4.ini"
+
+
+echo "beginning slicing..."
+
+# Set the number of runs that each SLURM task should do
+PER_ARRAY=278
+
+
+# Calculate the starting and ending values for this task based
+# on the SLURM task and the number of runs per task.
+START_NUM=$(( ($SLURM_ARRAY_TASK_ID - 1) * $PER_ARRAY ))
+END_NUM=$(( $SLURM_ARRAY_TASK_ID * $PER_ARRAY))
+
+STL_FILES=($(find $IN_DIR -name "*.stl" | sed -n "${START_NUM},${END_NUM}p"))
+
+parallel_command="parallel --bar -j $SLURM_NTASKS --delay .2 --joblog Add path to log file here"
+
+$parallel_command "python slice_binary_gcode.py $IN_DIR $PRUSA_PATH $CONFIG_DIR $CONFIG_NAMES {} $OUT_DIR_1 $OUT_DIR_2 " ::: ${STL_FILES[@]}
+
+echo "Slicing complete for task $SLURM_ARRAY_TASK_ID"
